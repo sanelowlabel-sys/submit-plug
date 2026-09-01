@@ -1,0 +1,6 @@
+{
+  "name": "Submit Plug",
+  "description": "Modern Spotify playlist pitching and curation platform connecting independent artists with verified curators for organic track placement.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

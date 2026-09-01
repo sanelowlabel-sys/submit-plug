@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  --sane-red: #BE1E2F;
+  --sane-red-hover: #e02438;
+  --sane-grey: #2b2b2b;      /* cards */
+  --sane-grey-2: #1a1a1a;    /* page + panels */
+  --sane-grey-3: #3a3a3a;    /* borders */
+  --sane-grey-4: #4a4a4a;
+  --sane-text: #ffffff;
+  --sane-text-muted: rgba(255, 255, 255, 0.65); /* optional dimmer copy */
+}
+
+body {
+  font-family: 'Exo', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--sane-text);
+  background: var(--sane-grey-2);
+}
+
+h1, h2, h3, h4, .title, .font-title {
+  font-family: 'Hammersmith One', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.font-mono-code {
+  font-family: 'DM Mono', monospace;
+}
+
+.card-sane {
+  background: var(--sane-grey);
+  border: 1px solid var(--sane-grey-3);
+  border-radius: 12px;
+}
+
+.card-panel {
+  background: var(--sane-grey-2);
+  border: 1px solid var(--sane-grey-3);
+  border-radius: 12px;
+}
+
+.btn-sane {
+  font-family: 'Hammersmith One', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--sane-red);
+  border: 2px solid var(--sane-red);
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-sane:hover {
+  background: #fff;
+  color: var(--sane-red);
+  border-color: #fff;
+}
+
+.btn-sane-outline {
+  font-family: 'Hammersmith One', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  background: transparent;
+  border: 2px solid var(--sane-grey-3);
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-sane-outline:hover {
+  border-color: var(--sane-red);
+  color: var(--sane-red);
+  background: rgba(190, 30, 47, 0.08);
+}
+
+a.sane-link {
+  color: var(--sane-red);
+  transition: color 0.15s ease;
+}
+
+a.sane-link:hover {
+  color: #fff;
+}
+
+/* Custom Scrollbar for Audio Wave & Inbox */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #BE1E2F;
+}
+
+/* Pulse badge animation */
+@keyframes plugPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+.animate-plug-pulse {
+  animation: plugPulse 2s infinite ease-in-out;
+}
+

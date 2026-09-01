@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Fix for sandboxed iframe environments where fetch is a getter-only property on Window.prototype
+      (function() {
+        try {
+          var _rawFetch = typeof window !== 'undefined' ? window.fetch : null;
+          var _fetch = _rawFetch ? function() {
+            return _rawFetch.apply(window, arguments);
+          } : null;
+
+          var desc = {
+            get: function() { return _fetch; },
+            set: function(val) { _fetch = val; },
+            configurable: true,
+            enumerable: true
+          };
+
+          if (typeof Window !== 'undefined' && Window.prototype) {
+            try {
+              Object.defineProperty(Window.prototype, 'fetch', desc);
+            } catch (e) {}
+          }
+          if (typeof window !== 'undefined') {
+            try {
+              Object.defineProperty(window, 'fetch', desc);
+            } catch (e) {}
+          }
+          if (typeof globalThis !== 'undefined') {
+            try {
+              Object.defineProperty(globalThis, 'fetch', desc);
+            } catch (e) {}
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Submit Plug | Independent Spotify Playlist Pitching Platform</title>
+    <meta name="description" content="Submit Plug connects independent music artists with verified Spotify playlist curators for track pitching, organic discovery, and real playlist placements." />
+    <meta property="og:title" content="Submit Plug | Spotify Playlist Pitching & Curation" />
+    <meta property="og:description" content="Submit your music directly to active Spotify playlist curators. Free and Premium pitches with guaranteed review." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Exo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Hammersmith+One&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#1a1a1a] text-white selection:bg-[#BE1E2F] selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
