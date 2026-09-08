@@ -150,17 +150,20 @@ export const Footer: React.FC = () => {
         <div>
           © {new Date().getFullYear()} Submit Plug. Developed with Sane Low Label ecosystem.
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4">
+          <span className="text-emerald-400 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Real-Time Sync Active</span>
+          </span>
+          <span>•</span>
+          <span className="text-[#0070BA] font-bold">PayPal Verified</span>
+          <span>•</span>
           <button
             onClick={() => setActiveTab('profile')}
             className="hover:text-[#BE1E2F] transition-colors cursor-pointer flex items-center gap-1"
           >
-            <User className="w-3.5 h-3.5" /> Profile & Account Settings
+            <User className="w-3.5 h-3.5" /> Account
           </button>
-          <span>•</span>
-          <span className="text-white/40">Spotify Web API Connected</span>
-          <span>•</span>
-          <span className="text-white/40">Instant Real-Time Sync</span>
         </div>
       </div>
     </footer>

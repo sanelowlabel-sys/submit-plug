@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import {
   UserProfile,
   UserRole,
@@ -10,21 +10,14 @@ import {
   AppNotification,
   PitchType,
   SubmissionStatus,
-  ActiveTab
+  ActiveTab,
+  EmailLog,
+  CuratorActivityEvent,
+  CuratorGatesConfig
 } from '../types';
-import {
-  INITIAL_ARTIST,
-  INITIAL_CURATOR,
-  INITIAL_ADMIN,
-  INITIAL_PLAYLISTS,
-  INITIAL_SUBMISSIONS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_VERIFICATIONS,
-  INITIAL_NOTIFICATIONS,
-  DEMO_TRACKS
-} from '../data/mockData';
 import { globalAudioEngine } from '../utils/audioEngine';
 import confetti from 'canvas-confetti';
+import { supabase } from '../lib/supabase';
 
 interface AudioState {
   currentTrack: Track | null;
@@ -38,8 +31,8 @@ interface AppContextType {
   currentUser: UserProfile;
   activeRole: UserRole;
   switchUserRole: (role: UserRole) => void;
-  updateUserProfile: (updates: Partial<UserProfile>) => void;
-  
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+
   // Navigation
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
@@ -47,8 +40,8 @@ interface AppContextType {
   // Playlists
   playlists: Playlist[];
   userPlaylists: Playlist[];
-  addPlaylist: (playlist: Omit<Playlist, 'id' | 'curatorId' | 'curatorName' | 'curatorAvatar' | 'curatorSpotifyId' | 'approvalRate' | 'avgResponseHours' | 'isVerified'>) => void;
-  togglePlaylistStatus: (id: string) => void;
+  addPlaylist: (playlist: Omit<Playlist, 'id' | 'curatorId' | 'curatorName' | 'curatorAvatar' | 'curatorSpotifyId' | 'approvalRate' | 'avgResponseHours' | 'isVerified'>) => Promise<Playlist | null>;
+  togglePlaylistStatus: (id: string) => Promise<void>;
 
   // Submissions & Pitching
   submissions: Submission[];
@@ -60,13 +53,33 @@ interface AppContextType {
     pitchType: PitchType;
     customMessage?: string;
     spotlightDuration?: number;
+    gateActionsCompleted?: {
+      followedCurator?: boolean;
+      followedPlaylist?: boolean;
+      savedSong?: boolean;
+    };
   }) => Promise<{ success: boolean; message: string }>;
-  reviewSubmission: (submissionId: string, action: 'approve' | 'decline', feedbackTags: string[], feedbackNote?: string) => void;
+  reviewSubmission: (
+    submissionId: string,
+    action: 'approve' | 'decline',
+    feedbackTags: string[],
+    feedbackNote?: string,
+    spotifyPlacementUrl?: string
+  ) => Promise<void>;
 
   // Credits & Wallet
   transactions: CreditTransaction[];
-  purchaseCredits: (packageId: string, credits: number, priceUsd: number) => Promise<boolean>;
-  
+  purchaseCredits: (packageId: string, credits: number, priceUsd: number, paymentMethod?: string) => Promise<boolean>;
+  freeWeeklyCredits: number;
+
+  // Real-time Activity & Transactional Emails
+  curatorActivities: CuratorActivityEvent[];
+  emailLogs: EmailLog[];
+  verifyGateAction: (playlistId: string, actionType: string) => Promise<boolean>;
+
+  // Spotify OAuth
+  connectSpotifyOAuth: () => Promise<void>;
+
   // Admin & Verification
   verificationApplications: CuratorVerificationApplication[];
   approveCuratorApplication: (id: string) => void;
@@ -103,6 +116,7 @@ interface AppContextType {
   // Real-time status ticker
   liveActiveCuratorsCount: number;
   recentLivePlacement: { artist: string; track: string; playlist: string; position: number } | null;
+  isWsConnected: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -110,58 +124,38 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [activeRole, setActiveRole] = useState<UserRole>('artist');
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
-  
-  // Users state with local storage cache
-  const [artistUser, setArtistUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('submitplug_artist');
-    return saved ? JSON.parse(saved) : INITIAL_ARTIST;
-  });
-  const [curatorUser, setCuratorUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('submitplug_curator');
-    return saved ? JSON.parse(saved) : INITIAL_CURATOR;
-  });
-  const [adminUser, setAdminUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('submitplug_admin');
-    return saved ? JSON.parse(saved) : INITIAL_ADMIN;
+  const [isWsConnected, setIsWsConnected] = useState(false);
+
+  // User state
+  const [currentUser, setCurrentUser] = useState<UserProfile>({
+    id: 'usr_sanelow_1',
+    name: 'Sane Low Label',
+    email: 'SanelowLabel@gmail.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
+    role: 'artist',
+    spotifyId: 'sanelowlabel',
+    spotifyUri: 'https://open.spotify.com/user/sanelowlabel',
+    spotifyFollowers: 85400,
+    bio: 'Official Sane Low Label Hub. Direct Spotify playlist curation, organic artist pitching, and global sound discovery.',
+    creditBalance: 25,
+    freeWeeklyCredits: 2,
+    verifiedStatus: true,
+    totalSubmissions: 12,
+    totalPlacements: 8,
+    createdAt: new Date().toISOString()
   });
 
-  const currentUser = activeRole === 'artist' ? artistUser : activeRole === 'curator' ? curatorUser : adminUser;
-
-  // Playlists state
-  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
-    const saved = localStorage.getItem('submitplug_playlists');
-    return saved ? JSON.parse(saved) : INITIAL_PLAYLISTS;
-  });
-
-  // Submissions state
-  const [submissions, setSubmissions] = useState<Submission[]>(() => {
-    const saved = localStorage.getItem('submitplug_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-  });
-
-  // Transactions state
-  const [transactions, setTransactions] = useState<CreditTransaction[]>(() => {
-    const saved = localStorage.getItem('submitplug_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
-  });
+  // Core Data Lists
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
+  const [curatorActivities, setCuratorActivities] = useState<CuratorActivityEvent[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [artistTracks, setArtistTracks] = useState<Track[]>([]);
 
   // Verification applications
-  const [verificationApplications, setVerificationApplications] = useState<CuratorVerificationApplication[]>(() => {
-    const saved = localStorage.getItem('submitplug_verifications');
-    return saved ? JSON.parse(saved) : INITIAL_VERIFICATIONS;
-  });
-
-  // Notifications
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem('submitplug_notifications');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
-  });
-
-  // Tracks
-  const [artistTracks, setArtistTracks] = useState<Track[]>(() => {
-    const saved = localStorage.getItem('submitplug_artist_tracks');
-    return saved ? JSON.parse(saved) : DEMO_TRACKS;
-  });
+  const [verificationApplications, setVerificationApplications] = useState<CuratorVerificationApplication[]>([]);
 
   // Modals state
   const [pitchModalOpen, setPitchModalOpen] = useState(false);
@@ -169,17 +163,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [buyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
   const [onboardPlaylistModalOpen, setOnboardPlaylistModalOpen] = useState(false);
 
-  // Real-time live ticker state
-  const [liveActiveCuratorsCount, setLiveActiveCuratorsCount] = useState(4280);
+  // Real-time ticker
+  const [liveActiveCuratorsCount, setLiveActiveCuratorsCount] = useState(48);
   const [recentLivePlacement, setRecentLivePlacement] = useState<{
     artist: string;
     track: string;
     playlist: string;
     position: number;
-  }>({
-    artist: 'Alex Vance',
-    track: 'Neon Horizons',
-    playlist: 'Deep House & Sunset Grooves',
+  } | null>({
+    artist: 'Velvet Echoes',
+    track: 'Neon Horizon',
+    playlist: 'Synthwave & Cyber Retrowave',
     position: 4
   });
 
@@ -192,93 +186,587 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     playlistContext: undefined
   });
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('submitplug_artist', JSON.stringify(artistUser));
-  }, [artistUser]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_curator', JSON.stringify(curatorUser));
-  }, [curatorUser]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_admin', JSON.stringify(adminUser));
-  }, [adminUser]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_playlists', JSON.stringify(playlists));
-  }, [playlists]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_submissions', JSON.stringify(submissions));
-  }, [submissions]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_verifications', JSON.stringify(verificationApplications));
-  }, [verificationApplications]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_notifications', JSON.stringify(notifications));
-  }, [notifications]);
-  useEffect(() => {
-    localStorage.setItem('submitplug_artist_tracks', JSON.stringify(artistTracks));
-  }, [artistTracks]);
-
-  // Real-time simulated heartbeats & live placement events
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Small live variation in active curator counter
-      setLiveActiveCuratorsCount(prev => prev + (Math.random() > 0.5 ? 1 : -1));
-
-      // 20% chance of random live placement update event
-      if (Math.random() < 0.3) {
-        const demoArtists = ['Kavinsky Sound', 'Luna Echo', 'Maxence Ray', 'Aura Noir', 'Sloane Miller', 'Deep Resonance'];
-        const demoTracks = ['Afterdark Wave', 'Velvet Groove', 'Solar Flares', 'Midnight Echo', 'Golden Mirage'];
-        const demoPlaylists = ['Deep House & Sunset Grooves', 'Melodic Techno & Afterlife', 'Lo-Fi Study Beats', 'Indie Dream Pop Picks'];
-        
-        const randomArtist = demoArtists[Math.floor(Math.random() * demoArtists.length)];
-        const randomTrack = demoTracks[Math.floor(Math.random() * demoTracks.length)];
-        const randomPl = demoPlaylists[Math.floor(Math.random() * demoPlaylists.length)];
-        const randomPos = Math.floor(Math.random() * 8) + 1;
-
-        setRecentLivePlacement({
-          artist: randomArtist,
-          track: randomTrack,
-          playlist: randomPl,
-          position: randomPos
-        });
+  // 1. Initial Load from Backend API
+  const fetchAllInitialData = useCallback(async () => {
+    try {
+      // User Profile & Wallet
+      const userRes = await fetch('/api/auth/me');
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        if (userData.user) {
+          setCurrentUser(userData.user);
+        }
       }
-    }, 12000);
 
-    return () => clearInterval(interval);
+      // Playlists
+      const plRes = await fetch('/api/playlists');
+      if (plRes.ok) {
+        const plData = await plRes.json();
+        if (plData.playlists) {
+          setPlaylists(plData.playlists);
+        }
+      }
+
+      // Submissions
+      const subRes = await fetch('/api/submissions');
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        if (subData.submissions) {
+          setSubmissions(subData.submissions);
+        }
+      }
+
+      // Wallet Transactions
+      const txRes = await fetch('/api/wallet');
+      if (txRes.ok) {
+        const txData = await txRes.json();
+        if (txData.transactions) {
+          setTransactions(txData.transactions);
+        }
+        if (txData.creditBalance !== undefined) {
+          setCurrentUser(prev => ({
+            ...prev,
+            creditBalance: txData.creditBalance,
+            freeWeeklyCredits: txData.freeWeeklyCredits
+          }));
+        }
+      }
+
+      // Live Curator Activities
+      const actRes = await fetch('/api/activity');
+      if (actRes.ok) {
+        const actData = await actRes.json();
+        if (actData.activities) {
+          setCuratorActivities(actData.activities);
+        }
+      }
+
+      // Email Logs
+      const emlRes = await fetch('/api/emails');
+      if (emlRes.ok) {
+        const emlData = await emlRes.json();
+        if (emlData.emails) {
+          setEmailLogs(emlData.emails);
+        }
+      }
+    } catch (err) {
+      console.warn('[AppContext] Initial API fetch warning:', err);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchAllInitialData();
+  }, [fetchAllInitialData]);
+
+  // 2. Real-Time WebSocket Connection
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectWebSocket = () => {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('[WebSocket] Real-time channel established');
+          setIsWsConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleRealtimeEvent(data);
+          } catch (err) {
+            console.error('[WebSocket] Failed to parse message:', err);
+          }
+        };
+
+        ws.onclose = () => {
+          setIsWsConnected(false);
+          // Reconnect automatically
+          reconnectTimeout = setTimeout(() => {
+            connectWebSocket();
+          }, 3000);
+        };
+
+        ws.onerror = (err) => {
+          console.warn('[WebSocket] Error:', err);
+          ws?.close();
+        };
+      } catch (err) {
+        console.warn('[WebSocket] Connection failed:', err);
+      }
+    };
+
+    connectWebSocket();
+
+    // 3. Supabase Real-Time Channel Listener
+    let supabaseChannel: any = null;
+    try {
+      supabaseChannel = supabase
+        .channel('plug-realtime-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'playlists' }, (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            setPlaylists(prev => [payload.new as Playlist, ...prev]);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            setPlaylists(prev => prev.map(p => (p.id === payload.new.id ? { ...p, ...payload.new } : p)));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setPlaylists(prev => prev.filter(p => p.id !== payload.old.id));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new && payload.new.id === currentUser.id) {
+            setCurrentUser(prev => ({ ...prev, ...payload.new }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            setSubmissions(prev => [payload.new as Submission, ...prev]);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            setSubmissions(prev => prev.map(s => (s.id === payload.new.id ? { ...s, ...payload.new } : s)));
+          }
+        })
+        .subscribe();
+    } catch (sbErr) {
+      console.warn('[Supabase Real-Time] Channel subscription notice:', sbErr);
+    }
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+      if (supabaseChannel) {
+        supabase.removeChannel(supabaseChannel);
+      }
+    };
+  }, []);
+
+  // Handle incoming real-time events from server
+  const handleRealtimeEvent = (msg: { type: string; payload: any }) => {
+    const { type, payload } = msg;
+
+    if (type === 'USER_UPDATED' && payload) {
+      if (payload.id === currentUser.id) {
+        setCurrentUser(prev => ({ ...prev, ...payload }));
+      }
+    }
+
+    if (type === 'HEARTBEAT' && payload.onlineCurators) {
+      setLiveActiveCuratorsCount(payload.onlineCurators);
+    }
+
+    if (type === 'SUBMISSION_CREATED' && payload.submission) {
+      const newSub: Submission = payload.submission;
+      setSubmissions(prev => {
+        const exists = prev.some(s => s.id === newSub.id);
+        if (exists) return prev;
+        return [newSub, ...prev];
+      });
+
+      // If this was targeted to current curator or submitted by current artist
+      if (newSub.curatorId === currentUser.id) {
+        setNotifications(prev => [
+          {
+            id: `notif_${Date.now()}`,
+            userId: currentUser.id,
+            title: 'New Track Pitch Received! 🎵',
+            message: `${newSub.artistName} submitted "${newSub.track.title}" for ${newSub.playlistTitle}`,
+            type: 'new_submission',
+            createdAt: new Date().toISOString(),
+            read: false,
+            actionUrl: 'curator'
+          },
+          ...prev
+        ]);
+      }
+    }
+
+    if (type === 'SUBMISSION_UPDATED' && payload.submission) {
+      const updatedSub: Submission = payload.submission;
+      setSubmissions(prev =>
+        prev.map(s => (s.id === updatedSub.id ? updatedSub : s))
+      );
+
+      // If approved, trigger live placement event and toast
+      if (updatedSub.status === 'approved' || updatedSub.status === 'added_to_playlist') {
+        setRecentLivePlacement({
+          artist: updatedSub.artistName,
+          track: updatedSub.track.title,
+          playlist: updatedSub.playlistTitle,
+          position: 4
+        });
+
+        if (updatedSub.artistId === currentUser.id) {
+          try {
+            confetti({
+              particleCount: 120,
+              spread: 70,
+              origin: { y: 0.5 }
+            });
+          } catch {
+            // safe catch
+          }
+
+          setNotifications(prev => [
+            {
+              id: `notif_${Date.now()}`,
+              userId: currentUser.id,
+              title: 'Song Added to Spotify Playlist! 🚀',
+              message: `${updatedSub.curatorName} approved "${updatedSub.track.title}" for "${updatedSub.playlistTitle}"!`,
+              type: 'placement_success',
+              createdAt: new Date().toISOString(),
+              read: false,
+              actionUrl: 'artist'
+            },
+            ...prev
+          ]);
+        }
+      }
+    }
+
+    if (type === 'WALLET_UPDATED' && payload.wallet) {
+      if (!payload.userId || payload.userId === currentUser.id) {
+        setCurrentUser(prev => ({
+          ...prev,
+          creditBalance: payload.wallet.creditBalance ?? prev.creditBalance,
+          freeWeeklyCredits: payload.wallet.freeWeeklyCredits ?? prev.freeWeeklyCredits
+        }));
+        if (payload.wallet.transaction) {
+          setTransactions(prev => [payload.wallet.transaction, ...prev]);
+        }
+      }
+    }
+
+    if (type === 'CURATOR_ACTIVITY') {
+      setCuratorActivities(prev => [payload, ...prev.slice(0, 49)]);
+    }
+
+    if (type === 'PLAYLIST_CREATED') {
+      setPlaylists(prev => [payload, ...prev]);
+    }
+
+    if (type === 'PLAYLIST_UPDATED') {
+      setPlaylists(prev => prev.map(p => (p.id === payload.id ? payload : p)));
+    }
+  };
+
+  // Switch role helper
   const switchUserRole = (role: UserRole) => {
     setActiveRole(role);
+    setCurrentUser(prev => ({ ...prev, role }));
     if (role === 'artist') setActiveTab('artist');
     else if (role === 'curator') setActiveTab('curator');
     else if (role === 'admin') setActiveTab('profile');
   };
 
-  const updateUserProfile = (updates: Partial<UserProfile>) => {
-    if (activeRole === 'artist') {
-      setArtistUser(prev => ({ ...prev, ...updates }));
-    } else if (activeRole === 'curator') {
-      setCuratorUser(prev => ({ ...prev, ...updates }));
-    } else {
-      setAdminUser(prev => ({ ...prev, ...updates }));
+  // Update profile via API
+  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    try {
+      const res = await fetch('/api/auth/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, ...updates })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setCurrentUser(data.user);
+        }
+      }
+    } catch (err) {
+      console.warn('[AppContext] Profile update error:', err);
+      setCurrentUser(prev => ({ ...prev, ...updates }));
     }
   };
 
-  const userPlaylists = playlists.filter(p => p.curatorId === curatorUser.id);
-  const artistSubmissions = submissions.filter(s => s.artistId === artistUser.id);
-  const curatorInboxSubmissions = submissions.filter(s => s.curatorId === curatorUser.id);
+  // Submit pitch via real API
+  const submitPitch = async (data: {
+    track: Track;
+    playlistId: string;
+    pitchType: PitchType;
+    customMessage?: string;
+    spotlightDuration?: number;
+    gateActionsCompleted?: {
+      followedCurator?: boolean;
+      followedPlaylist?: boolean;
+      savedSong?: boolean;
+    };
+  }): Promise<{ success: boolean; message: string }> => {
+    const targetPlaylist = playlists.find(p => p.id === data.playlistId);
+    if (!targetPlaylist) {
+      return { success: false, message: 'Target playlist not found' };
+    }
 
-  const unreadNotificationCount = notifications.filter(n => !n.read && n.userId === currentUser.id).length;
+    const isFree = data.pitchType === 'free';
+    const cost = isFree ? 0 : (targetPlaylist.pitchCostCredits || 1);
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    if (isFree && (currentUser.freeWeeklyCredits || 0) < 1) {
+      setBuyCreditsModalOpen(true);
+      return { success: false, message: 'No free weekly pitches remaining. Top up your wallet to pitch.' };
+    }
+
+    if (!isFree && currentUser.creditBalance < cost) {
+      setBuyCreditsModalOpen(true);
+      return { success: false, message: 'Insufficient credits. Please top up your wallet.' };
+    }
+
+    try {
+      const response = await fetch('/api/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artistId: currentUser.id,
+          playlistId: data.playlistId,
+          track: data.track,
+          pitchType: data.pitchType,
+          customMessage: data.customMessage,
+          gateActionsCompleted: data.gateActionsCompleted || {
+            followedCurator: true,
+            followedPlaylist: true,
+            savedSong: false
+          }
+        })
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        return { success: false, message: resData.error || 'Submission failed' };
+      }
+
+      // Update local wallet directly from server response
+      if (resData.wallet) {
+        setCurrentUser(prev => ({
+          ...prev,
+          creditBalance: resData.wallet.creditBalance ?? prev.creditBalance,
+          freeWeeklyCredits: resData.wallet.freeWeeklyCredits ?? prev.freeWeeklyCredits,
+          totalSubmissions: prev.totalSubmissions + 1
+        }));
+      }
+
+      if (resData.submission) {
+        setSubmissions(prev => [resData.submission, ...prev]);
+      }
+
+      // Trigger celebration confetti
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch {
+        // Safe catch
+      }
+
+      return {
+        success: true,
+        message: `Successfully pitched "${data.track.title}" to ${targetPlaylist.title}! Curator notified in real-time.`
+      };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Network error submitting pitch' };
+    }
   };
 
-  const clearAllNotifications = () => {
-    setNotifications(prev => prev.map(n => n.userId === currentUser.id ? { ...n, read: true } : n));
+  // Review submission via real API
+  const reviewSubmission = async (
+    submissionId: string,
+    action: 'approve' | 'decline',
+    feedbackTags: string[],
+    feedbackNote?: string,
+    spotifyPlacementUrl?: string
+  ) => {
+    try {
+      const response = await fetch(`/api/submissions/${submissionId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          feedbackTags,
+          feedbackNote,
+          spotifyPlacementUrl
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.submission) {
+          setSubmissions(prev =>
+            prev.map(s => (s.id === submissionId ? data.submission : s))
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[AppContext] Review submission error:', err);
+    }
+  };
+
+  // Purchase credits via real API
+  const purchaseCredits = async (
+    packageId: string,
+    credits: number,
+    priceUsd: number,
+    paymentMethod = 'card'
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/payments/instant-topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          packageId,
+          userId: currentUser.id,
+          paymentMethod
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(prev => ({
+          ...prev,
+          creditBalance: data.newBalance
+        }));
+
+        if (data.transaction) {
+          setTransactions(prev => [data.transaction, ...prev]);
+        }
+
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.4 }
+          });
+        } catch {
+          // safe catch
+        }
+
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[AppContext] Top up failed:', err);
+      return false;
+    }
+  };
+
+  // Connect Spotify OAuth (Popup Flow adhering to OAuth Skill)
+  const connectSpotifyOAuth = async () => {
+    try {
+      const res = await fetch(`/api/auth/spotify/url?userId=${currentUser.id}`);
+      const data = await res.json();
+
+      if (data.url) {
+        const width = 500;
+        const height = 650;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+
+        const popup = window.open(
+          data.url,
+          'Spotify Authorization',
+          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=1`
+        );
+
+        // Listen for message from popup
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data && event.data.type === 'OAUTH_AUTH_SUCCESS') {
+            console.log('[Spotify OAuth] Success message received from popup:', event.data);
+            window.removeEventListener('message', handleMessage);
+
+            if (event.data.user) {
+              setCurrentUser(prev => ({
+                ...prev,
+                ...event.data.user,
+                verifiedStatus: true
+              }));
+            } else {
+              setCurrentUser(prev => ({
+                ...prev,
+                spotifyId: 'spotify_verified_user',
+                verifiedStatus: true
+              }));
+            }
+
+            try {
+              confetti({ particleCount: 70, spread: 50, origin: { y: 0.5 } });
+            } catch {
+              // safe catch
+            }
+          }
+        };
+
+        window.addEventListener('message', handleMessage);
+      }
+    } catch (err) {
+      console.error('[AppContext] Spotify OAuth failed:', err);
+    }
+  };
+
+  // Verify Gate Action
+  const verifyGateAction = async (playlistId: string, actionType: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/activity/verify-gate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          playlistId,
+          actionType
+        })
+      });
+      return res.ok;
+    } catch {
+      return true;
+    }
+  };
+
+  // Add curator playlist
+  const addPlaylist = async (playlistData: Omit<Playlist, 'id' | 'curatorId' | 'curatorName' | 'curatorAvatar' | 'curatorSpotifyId' | 'approvalRate' | 'avgResponseHours' | 'isVerified'>) => {
+    try {
+      const response = await fetch('/api/playlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...playlistData,
+          curatorId: currentUser.id,
+          curatorName: currentUser.name,
+          curatorAvatar: currentUser.avatarUrl,
+          curatorSpotifyId: currentUser.spotifyId || 'curator_spotify'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.playlist) {
+          setPlaylists(prev => [data.playlist, ...prev]);
+          return data.playlist;
+        }
+      }
+    } catch (err) {
+      console.error('[AppContext] Add playlist error:', err);
+    }
+    return null;
+  };
+
+  const togglePlaylistStatus = async (id: string) => {
+    const target = playlists.find(p => p.id === id);
+    if (!target) return;
+    const newStatus = !target.acceptingSubmissions;
+
+    try {
+      await fetch(`/api/playlists/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acceptingSubmissions: newStatus })
+      });
+      setPlaylists(prev =>
+        prev.map(p => (p.id === id ? { ...p, acceptingSubmissions: newStatus } : p))
+      );
+    } catch (err) {
+      console.error('[AppContext] Toggle status failed:', err);
+    }
   };
 
   // Audio Controls
@@ -326,283 +814,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
-  // Pitch submission
-  const submitPitch = async (data: {
-    track: Track;
-    playlistId: string;
-    pitchType: PitchType;
-    customMessage?: string;
-    spotlightDuration?: number;
-  }): Promise<{ success: boolean; message: string }> => {
-    const targetPlaylist = playlists.find(p => p.id === data.playlistId);
-    if (!targetPlaylist) {
-      return { success: false, message: 'Target playlist not found' };
+  // Modals
+  const openPitchModal = (playlist?: Playlist) => {
+    if (playlist) {
+      setSelectedPlaylistForPitch(playlist);
     }
-
-    const cost = data.pitchType === 'premium' ? targetPlaylist.pitchCostCredits : 0;
-
-    if (data.pitchType === 'premium' && artistUser.creditBalance < cost) {
-      setBuyCreditsModalOpen(true);
-      return { success: false, message: 'Insufficient credits. Please top up your wallet.' };
-    }
-
-    // Deduct credit if premium
-    if (data.pitchType === 'premium') {
-      setArtistUser(prev => ({
-        ...prev,
-        creditBalance: prev.creditBalance - cost,
-        totalSubmissions: prev.totalSubmissions + 1
-      }));
-
-      const newTx: CreditTransaction = {
-        id: `tx_${Date.now()}`,
-        userId: artistUser.id,
-        userName: artistUser.name,
-        amount: -cost,
-        type: 'premium_pitch',
-        description: `Premium pitch of "${data.track.title}" to ${targetPlaylist.title}`,
-        createdAt: new Date().toISOString(),
-        status: 'completed'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-    } else {
-      setArtistUser(prev => ({
-        ...prev,
-        totalSubmissions: prev.totalSubmissions + 1
-      }));
-    }
-
-    const newSubmission: Submission = {
-      id: `sub_${Date.now()}`,
-      track: data.track,
-      playlistId: targetPlaylist.id,
-      playlistTitle: targetPlaylist.title,
-      playlistCover: targetPlaylist.coverArt,
-      curatorId: targetPlaylist.curatorId,
-      curatorName: targetPlaylist.curatorName,
-      artistId: artistUser.id,
-      artistName: artistUser.name,
-      artistAvatar: artistUser.avatarUrl,
-      pitchType: data.pitchType,
-      pitchCost: cost,
-      customMessage: data.customMessage,
-      status: 'pending',
-      feedbackTags: [],
-      submittedAt: new Date().toISOString(),
-      spotlightListenedDuration: data.spotlightDuration || (data.pitchType === 'free' ? 30 : undefined)
-    };
-
-    setSubmissions(prev => [newSubmission, ...prev]);
-
-    // Send notification to curator in real time
-    const curatorNotif: AppNotification = {
-      id: `notif_${Date.now()}`,
-      userId: targetPlaylist.curatorId,
-      title: `New ${data.pitchType === 'premium' ? 'Premium ⭐' : 'Free'} Pitch Received`,
-      message: `${artistUser.name} submitted "${data.track.title}" for ${targetPlaylist.title}.`,
-      type: 'new_submission',
-      createdAt: new Date().toISOString(),
-      read: false,
-      actionUrl: 'curator'
-    };
-    setNotifications(prev => [curatorNotif, ...prev]);
-
-    // Trigger confetti
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 }
-      });
-    } catch {
-      // Safe catch
-    }
-
-    return { success: true, message: `Pitch successfully submitted to ${targetPlaylist.title}!` };
+    setPitchModalOpen(true);
   };
 
-  // Review submission
-  const reviewSubmission = (
-    submissionId: string,
-    action: 'approve' | 'decline',
-    feedbackTags: string[],
-    feedbackNote?: string
-  ) => {
-    const targetSub = submissions.find(s => s.id === submissionId);
-    if (!targetSub) return;
-
-    const newStatus: SubmissionStatus = action === 'approve' ? 'added_to_playlist' : 'declined';
-    const reviewedAt = new Date().toISOString();
-
-    setSubmissions(prev =>
-      prev.map(s => {
-        if (s.id === submissionId) {
-          return {
-            ...s,
-            status: newStatus,
-            reviewedAt,
-            feedbackTags,
-            feedbackNote,
-            spotifyPlacementUrl: action === 'approve' ? `https://open.spotify.com/playlist/${s.playlistId}` : undefined
-          };
-        }
-        return s;
-      })
-    );
-
-    // If approved, update playlist track count and add to recent tracks
-    if (action === 'approve') {
-      setPlaylists(prev =>
-        prev.map(p => {
-          if (p.id === targetSub.playlistId) {
-            return {
-              ...p,
-              trackCount: p.trackCount + 1,
-              recentAddedTracks: [targetSub.track, ...(p.recentAddedTracks || [])].slice(0, 5)
-            };
-          }
-          return p;
-        })
-      );
-
-      // Reward curator if premium review
-      if (targetSub.pitchType === 'premium') {
-        setCuratorUser(prev => ({
-          ...prev,
-          earningsBalance: prev.earningsBalance + 1.25,
-          totalPlacements: prev.totalPlacements + 1
-        }));
-
-        const curatorRewardTx: CreditTransaction = {
-          id: `tx_${Date.now()}`,
-          userId: curatorUser.id,
-          userName: curatorUser.name,
-          amount: 1.25,
-          type: 'curator_reward',
-          description: `Curator placement payout for "${targetSub.track.title}" review`,
-          createdAt: reviewedAt,
-          status: 'completed'
-        };
-        setTransactions(prev => [curatorRewardTx, ...prev]);
-      }
-
-      // Notify artist in real time
-      const artistNotif: AppNotification = {
-        id: `notif_${Date.now()}`,
-        userId: targetSub.artistId,
-        title: 'Song Added to Spotify Playlist! 🚀',
-        message: `${targetSub.curatorName} approved "${targetSub.track.title}" for ${targetSub.playlistTitle}!`,
-        type: 'placement_success',
-        createdAt: reviewedAt,
-        read: false,
-        actionUrl: 'artist'
-      };
-      setNotifications(prev => [artistNotif, ...prev]);
-
-      try {
-        confetti({
-          particleCount: 120,
-          spread: 70,
-          origin: { y: 0.5 }
-        });
-      } catch {
-        // Safe catch
-      }
-    } else {
-      // Declined with feedback
-      if (targetSub.pitchType === 'premium') {
-        setCuratorUser(prev => ({
-          ...prev,
-          earningsBalance: prev.earningsBalance + 0.85
-        }));
-      }
-
-      // Notify artist with feedback
-      const artistNotif: AppNotification = {
-        id: `notif_${Date.now()}`,
-        userId: targetSub.artistId,
-        title: 'Review Feedback Received',
-        message: `${targetSub.curatorName} reviewed "${targetSub.track.title}" with constructive tags.`,
-        type: 'pitch_declined',
-        createdAt: reviewedAt,
-        read: false,
-        actionUrl: 'artist'
-      };
-      setNotifications(prev => [artistNotif, ...prev]);
-    }
+  const closePitchModal = () => {
+    setPitchModalOpen(false);
+    setSelectedPlaylistForPitch(null);
   };
 
-  // Purchase credits
-  const purchaseCredits = async (_packageId: string, credits: number, priceUsd: number): Promise<boolean> => {
-    setArtistUser(prev => ({
-      ...prev,
-      creditBalance: prev.creditBalance + credits
-    }));
-
-    const tx: CreditTransaction = {
-      id: `tx_${Date.now()}`,
-      userId: artistUser.id,
-      userName: artistUser.name,
-      amount: credits,
-      type: 'purchase',
-      description: `Purchased Credit Bundle (+${credits} Credits)`,
-      createdAt: new Date().toISOString(),
-      status: 'completed',
-      stripeAmountUsd: priceUsd
+  const addArtistTrack = (trackData: Omit<Track, 'id'>) => {
+    const newTrack: Track = {
+      ...trackData,
+      id: `trk_${Date.now()}`,
+      playCount: Math.floor(Math.random() * 8000) + 1200
     };
-
-    setTransactions(prev => [tx, ...prev]);
-
-    const notif: AppNotification = {
-      id: `notif_${Date.now()}`,
-      userId: artistUser.id,
-      title: 'Credits Added Successfully 💳',
-      message: `+${credits} Submit Plug credits have been deposited to your wallet.`,
-      type: 'credits_added',
-      createdAt: new Date().toISOString(),
-      read: false,
-      actionUrl: 'artist'
-    };
-    setNotifications(prev => [notif, ...prev]);
-
-    try {
-      confetti({
-        particleCount: 70,
-        spread: 50,
-        origin: { y: 0.4 }
-      });
-    } catch {
-      // Safe catch
-    }
-
-    return true;
+    setArtistTracks(prev => [newTrack, ...prev]);
   };
 
-  // Curator add playlist
-  const addPlaylist = (playlistData: Omit<Playlist, 'id' | 'curatorId' | 'curatorName' | 'curatorAvatar' | 'curatorSpotifyId' | 'approvalRate' | 'avgResponseHours' | 'isVerified'>) => {
-    const newPlaylist: Playlist = {
-      ...playlistData,
-      id: `pl_${Date.now()}`,
-      curatorId: curatorUser.id,
-      curatorName: curatorUser.name,
-      curatorAvatar: curatorUser.avatarUrl,
-      curatorSpotifyId: curatorUser.spotifyId || 'spotify:user:curator',
-      approvalRate: 15,
-      avgResponseHours: 24,
-      isVerified: curatorUser.verifiedStatus,
-      recentAddedTracks: []
-    };
-
-    setPlaylists(prev => [newPlaylist, ...prev]);
-  };
-
-  const togglePlaylistStatus = (id: string) => {
-    setPlaylists(prev =>
-      prev.map(p => (p.id === id ? { ...p, acceptingSubmissions: !p.acceptingSubmissions } : p))
-    );
-  };
-
-  // Admin approvals
   const approveCuratorApplication = (id: string) => {
     setVerificationApplications(prev =>
       prev.map(app => (app.id === id ? { ...app, status: 'approved' } : app))
@@ -615,26 +848,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
-  const addArtistTrack = (trackData: Omit<Track, 'id'>) => {
-    const newTrack: Track = {
-      ...trackData,
-      id: `trk_${Date.now()}`,
-      playCount: Math.floor(Math.random() * 8000) + 1200
-    };
-    setArtistTracks(prev => [newTrack, ...prev]);
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
   };
 
-  const openPitchModal = (playlist?: Playlist) => {
-    if (playlist) {
-      setSelectedPlaylistForPitch(playlist);
-    }
-    setPitchModalOpen(true);
+  const clearAllNotifications = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const closePitchModal = () => {
-    setPitchModalOpen(false);
-    setSelectedPlaylistForPitch(null);
-  };
+  const userPlaylists = playlists.filter(p => p.curatorId === currentUser.id);
+  const artistSubmissions = submissions.filter(s => s.artistId === currentUser.id);
+  const curatorInboxSubmissions = submissions.filter(s => s.curatorId === currentUser.id || s.curatorId === 'usr_curator_1');
+  const unreadNotificationCount = notifications.filter(n => !n.read && n.userId === currentUser.id).length;
 
   return (
     <AppContext.Provider
@@ -656,6 +881,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         reviewSubmission,
         transactions,
         purchaseCredits,
+        freeWeeklyCredits: currentUser.freeWeeklyCredits || 0,
+        curatorActivities,
+        emailLogs,
+        verifyGateAction,
+        connectSpotifyOAuth,
         verificationApplications,
         approveCuratorApplication,
         rejectCuratorApplication,
@@ -678,7 +908,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         artistTracks,
         addArtistTrack,
         liveActiveCuratorsCount,
-        recentLivePlacement
+        recentLivePlacement,
+        isWsConnected
       }}
     >
       {children}

@@ -20,8 +20,9 @@ import {
   SkipForward,
   RotateCcw,
   Sliders,
-  DollarSign,
-  AlertCircle
+  AlertCircle,
+  UserPlus,
+  Heart
 } from 'lucide-react';
 
 export const CuratorDashboard: React.FC = () => {
@@ -34,15 +35,16 @@ export const CuratorDashboard: React.FC = () => {
     setOnboardPlaylistModalOpen,
     audioState,
     playTrack,
-    pauseTrack
+    pauseTrack,
+    curatorActivities
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'inbox' | 'playlists' | 'earnings' | 'verification'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'playlists' | 'growth' | 'verification'>('inbox');
   const [selectedSubForReview, setSelectedSubForReview] = useState<Submission | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'decline' | null>(null);
   const [feedbackTags, setFeedbackTags] = useState<string[]>([]);
   const [customNote, setCustomNote] = useState('');
-  const [payoutRequested, setPayoutRequested] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const pendingSubmissions = curatorInboxSubmissions.filter(s => s.status === 'pending');
   const completedSubmissions = curatorInboxSubmissions.filter(s => s.status !== 'pending');
@@ -65,15 +67,17 @@ export const CuratorDashboard: React.FC = () => {
     setCustomNote('');
   };
 
-  const handleConfirmReview = () => {
+  const handleConfirmReview = async () => {
     if (!selectedSubForReview || !reviewAction) return;
 
-    reviewSubmission(
+    setIsSubmittingReview(true);
+    await reviewSubmission(
       selectedSubForReview.id,
       reviewAction,
       feedbackTags,
       customNote || (reviewAction === 'approve' ? 'Added into current rotation!' : 'Good track, just not fitting our sound palette.')
     );
+    setIsSubmittingReview(false);
 
     setSelectedSubForReview(null);
     setReviewAction(null);
@@ -117,7 +121,7 @@ export const CuratorDashboard: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3 text-xs font-mono-code text-white/50 mt-2">
               <span>{userPlaylists.length} Connected Spotify Playlists</span>
               <span>•</span>
-              <span className="text-emerald-400 font-bold">100% On-Time Response Guarantee</span>
+              <span className="text-emerald-400 font-bold">100% Real-Time Push Active</span>
             </div>
           </div>
         </div>
@@ -125,23 +129,46 @@ export const CuratorDashboard: React.FC = () => {
         {/* Action Right */}
         <div className="flex items-center gap-3">
           <div className="card-panel px-4 py-2.5 rounded-xl border border-[#3a3a3a] flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <Coins className="w-4 h-4 text-amber-400" />
             <div className="text-left">
-              <div className="text-[10px] text-white/50 font-mono-code">AVAILABLE PAYOUT</div>
-              <div className="text-xs font-bold font-mono-code text-emerald-400">
-                ${currentUser.earningsBalance.toFixed(2)} USD
+              <div className="text-[10px] text-white/50 font-mono-code">SUBMISSION CREDITS</div>
+              <div className="text-xs font-bold font-mono-code text-white">
+                {currentUser.creditBalance} Credits
               </div>
             </div>
           </div>
 
           <button
             onClick={() => setOnboardPlaylistModalOpen(true)}
-            className="btn-sane text-xs px-5 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/20"
+            className="btn-sane text-xs px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/30 hover:scale-[1.02] transition-transform"
           >
             <Plus className="w-4 h-4" />
-            CONNECT PLAYLIST
+            SUBMIT PLAYLIST
           </button>
         </div>
+      </div>
+
+      {/* Hero Curator Action Banner */}
+      <div className="card-sane p-6 rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-[#14231b] via-[#1a1a1a] to-[#1a1a1a] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-mono-code text-emerald-400 font-bold">
+            <Radio className="w-4 h-4" />
+            <span>CURATOR ONBOARDING & INGESTION</span>
+          </div>
+          <h2 className="text-xl font-title font-bold text-white">
+            SUBMIT PLAYLIST WITH DEDICATED WIZARD
+          </h2>
+          <p className="text-xs text-white/60 font-mono-code max-w-2xl leading-relaxed">
+            Curators can choose when they accept free or premium submissions, set exact credit pricing (1 to 10+ credits), and configure Spotify follower & track save gates.
+          </p>
+        </div>
+        <button
+          onClick={() => setOnboardPlaylistModalOpen(true)}
+          className="btn-sane text-xs px-6 py-3.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-xl shadow-[#BE1E2F]/30 whitespace-nowrap bg-emerald-600 hover:bg-emerald-500 text-white border-none"
+        >
+          <Plus className="w-4 h-4" />
+          SUBMIT PLAYLIST WIZARD
+        </button>
       </div>
 
       {/* Curator Metrics */}
@@ -181,108 +208,111 @@ export const CuratorDashboard: React.FC = () => {
 
         <div className="card-sane p-4 rounded-xl border border-[#3a3a3a]">
           <div className="text-[11px] text-white/50 font-mono-code flex items-center justify-between">
-            <span>CURATOR REPUTATION</span>
-            <Sparkles className="w-3.5 h-3.5 text-[#BE1E2F]" />
+            <span>RESPONSE SPEED</span>
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold font-title text-emerald-400 mt-1">
-            99.4%
+            ~18h
           </div>
-          <div className="text-[10px] text-emerald-400/60 font-mono-code mt-0.5">18h Average Response</div>
+          <div className="text-[10px] text-emerald-400/60 font-mono-code mt-0.5">Guaranteed 48h Window</div>
         </div>
       </div>
 
-      {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-[#3a3a3a] pb-3 overflow-x-auto">
+      {/* Curator Tabs */}
+      <div className="flex border-b border-[#3a3a3a] space-x-6 text-sm font-title">
         <button
           onClick={() => setActiveTab('inbox')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'inbox'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+          className={`pb-3 relative flex items-center gap-2 cursor-pointer ${
+            activeTab === 'inbox' ? 'text-white border-b-2 border-[#BE1E2F]' : 'text-white/50 hover:text-white'
           }`}
         >
-          <ListMusic className="w-3.5 h-3.5" />
-          STUDIO REVIEW INBOX ({pendingSubmissions.length})
+          <span>SUBMISSION INBOX</span>
+          {pendingSubmissions.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-[#BE1E2F] text-[10px] text-white font-mono-code">
+              {pendingSubmissions.length}
+            </span>
+          )}
         </button>
 
         <button
           onClick={() => setActiveTab('playlists')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'playlists'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+          className={`pb-3 relative flex items-center gap-2 cursor-pointer ${
+            activeTab === 'playlists' ? 'text-white border-b-2 border-[#BE1E2F]' : 'text-white/50 hover:text-white'
           }`}
         >
-          <Radio className="w-3.5 h-3.5" />
-          MANAGED PLAYLISTS ({userPlaylists.length})
+          <span>MY PLAYLISTS</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-[#2b2b2b] text-[10px] text-white/60 font-mono-code">
+            {userPlaylists.length}
+          </span>
         </button>
 
         <button
-          onClick={() => setActiveTab('earnings')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'earnings'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+          onClick={() => setActiveTab('growth')}
+          className={`pb-3 relative flex items-center gap-2 cursor-pointer ${
+            activeTab === 'growth' ? 'text-white border-b-2 border-[#BE1E2F]' : 'text-white/50 hover:text-white'
           }`}
         >
-          <Coins className="w-3.5 h-3.5" />
-          EARNINGS & STRIPE PAYOUTS
+          <span>GROWTH & GATES</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono-code font-bold">
+            Live
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('verification')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'verification'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+          className={`pb-3 relative flex items-center gap-2 cursor-pointer ${
+            activeTab === 'verification' ? 'text-white border-b-2 border-[#BE1E2F]' : 'text-white/50 hover:text-white'
           }`}
         >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          CURATOR VERIFICATION STATUS
+          <span>VERIFICATION</span>
         </button>
       </div>
 
-      {/* TAB 1: Studio Review Inbox */}
+      {/* TAB 1: Inbox */}
       {activeTab === 'inbox' && (
         <div className="space-y-4">
           {pendingSubmissions.length === 0 ? (
-            <div className="card-sane p-12 text-center rounded-2xl border border-[#3a3a3a]">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <h3 className="text-base font-title text-white">Your review inbox is all caught up!</h3>
-              <p className="text-xs text-white/60 font-mono-code mt-1">
-                New pitches from artists will appear here automatically in real time.
+            <div className="card-sane p-12 text-center rounded-2xl border border-[#3a3a3a] space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#2b2b2b] flex items-center justify-center mx-auto text-white/50">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h3 className="text-base font-title text-white">INBOX ZERO ACHIEVED</h3>
+              <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto">
+                You have reviewed all incoming pitches. New pitches will appear here dynamically in real-time as artists submit them!
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-3">
               {pendingSubmissions.map(sub => {
-                const isPlayingThis =
-                  audioState.isPlaying && audioState.currentTrack?.id === sub.track.id;
+                const isPlaying = audioState.currentTrack?.id === sub.track.id && audioState.isPlaying;
 
                 return (
                   <div
                     key={sub.id}
-                    className="card-sane p-6 rounded-2xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all space-y-4 shadow-xl"
+                    className="card-sane p-5 rounded-2xl border border-[#3a3a3a] space-y-4 hover:border-[#BE1E2F]/40 transition-all shadow-md"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      {/* Left: Track Details */}
+                      {/* Left: Track Info & Play Button */}
                       <div className="flex items-center gap-4">
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-[#3a3a3a]">
+                        <div className="relative group">
                           <img
                             src={sub.track.albumArt}
                             alt={sub.track.title}
-                            className="w-full h-full object-cover"
+                            className="w-16 h-16 rounded-xl object-cover border border-[#3a3a3a]"
                             referrerPolicy="no-referrer"
                           />
                           <button
                             onClick={() => {
-                              if (isPlayingThis) pauseTrack();
-                              else playTrack(sub.track, sub.playlistTitle);
+                              if (isPlaying) {
+                                pauseTrack();
+                              } else {
+                                playTrack(sub.track, sub.playlistTitle);
+                              }
                             }}
-                            className="absolute inset-0 bg-black/40 hover:bg-black/70 flex items-center justify-center text-white cursor-pointer"
+                            className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
                           >
-                            {isPlayingThis ? (
-                              <Pause className="w-6 h-6 fill-current text-[#BE1E2F]" />
+                            {isPlaying ? (
+                              <Pause className="w-6 h-6 fill-current" />
                             ) : (
                               <Play className="w-6 h-6 fill-current ml-0.5" />
                             )}
@@ -291,16 +321,16 @@ export const CuratorDashboard: React.FC = () => {
 
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-base font-bold font-title text-white">
+                            <h4 className="text-base font-bold font-title text-white">
                               {sub.track.title}
-                            </h3>
+                            </h4>
                             {sub.pitchType === 'premium' ? (
-                              <span className="px-2 py-0.5 rounded bg-[#BE1E2F]/20 text-[#BE1E2F] text-[10px] font-mono-code font-bold border border-[#BE1E2F]/40">
-                                PREMIUM ⭐ ($1.25 Payout)
+                              <span className="px-2 py-0.5 rounded bg-[#BE1E2F] text-white text-[10px] font-mono-code font-bold">
+                                PREMIUM PITCH ⭐
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono-code font-bold border border-emerald-500/40">
-                                FREE SPOTLIGHT
+                                FREE GATE PITCH
                               </span>
                             )}
                           </div>
@@ -321,7 +351,7 @@ export const CuratorDashboard: React.FC = () => {
                           href={sub.track.spotifyUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-2.5 rounded-xl bg-[#1a1a1a] border border-[#3a3a3a] text-white/60 hover:text-white hover:border-[#BE1E2F]"
+                          className="p-2.5 rounded-xl bg-[#1a1a1a] border border-[#3a3a3a] text-white/60 hover:text-white hover:border-[#BE1E2F] cursor-pointer"
                           title="Open Spotify Track Link"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -376,8 +406,27 @@ export const CuratorDashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {userPlaylists.map(pl => (
+          {userPlaylists.length === 0 ? (
+            <div className="card-sane p-10 text-center rounded-2xl border border-[#3a3a3a] space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#BE1E2F]/15 text-[#BE1E2F] flex items-center justify-center mx-auto">
+                <ListMusic className="w-7 h-7" />
+              </div>
+              <div>
+                <h4 className="text-lg font-title font-bold text-white">NO PLAYLISTS SUBMITTED YET</h4>
+                <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto mt-1">
+                  Upload your first verified Spotify playlist using our dedicated wizard. You can configure free submissions, premium pitch fees, and follow gates.
+                </p>
+              </div>
+              <button
+                onClick={() => setOnboardPlaylistModalOpen(true)}
+                className="btn-sane text-xs px-6 py-3 rounded-xl font-bold inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+              >
+                <Plus className="w-4 h-4" /> SUBMIT PLAYLIST WIZARD
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {userPlaylists.map(pl => (
               <div
                 key={pl.id}
                 className="card-sane p-5 rounded-2xl border border-[#3a3a3a] space-y-4 shadow-md"
@@ -434,46 +483,83 @@ export const CuratorDashboard: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
-      {/* TAB 3: Earnings & Payouts */}
-      {activeTab === 'earnings' && (
+      {/* TAB 3: Growth & Curator Benefits */}
+      {activeTab === 'growth' && (
         <div className="space-y-6">
-          <div className="card-panel p-6 rounded-2xl border border-[#3a3a3a] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="card-panel p-6 rounded-2xl border border-[#3a3a3a] space-y-4">
             <div>
-              <div className="text-xs font-mono-code text-emerald-400 font-bold">CURATOR REVENUE POOL</div>
-              <div className="text-3xl font-bold font-title text-white mt-1">
-                ${currentUser.earningsBalance.toFixed(2)} USD
-              </div>
-              <p className="text-xs text-white/60 font-mono-code mt-1">
-                You earn $1.25 USD for every verified premium pitch review completed on time.
+              <span className="text-xs font-mono-code text-emerald-400 font-bold">
+                ORGANIC PLAYLIST GROWTH ENGINE
+              </span>
+              <h3 className="text-2xl font-title text-white mt-1">
+                FOLLOWER GATES CONVERSION ANALYTICS
+              </h3>
+              <p className="text-xs text-white/60 font-mono-code mt-1 max-w-2xl">
+                Curators grow their Spotify ecosystem on Submit Plug through verified artist actions: Every free pitch requires artists to follow your Spotify profile, follow your playlist, and save your featured spotlight tracks.
               </p>
             </div>
 
-            <button
-              disabled={currentUser.earningsBalance < 10 || payoutRequested}
-              onClick={() => {
-                setPayoutRequested(true);
-                setTimeout(() => setPayoutRequested(false), 5000);
-              }}
-              className={`btn-sane text-xs px-6 py-3 rounded-xl font-bold shadow-lg shadow-[#BE1E2F]/20 ${
-                currentUser.earningsBalance < 10 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-              }`}
-            >
-              {payoutRequested ? 'Payout Initiated to Stripe!' : 'REQUEST STRIPE PAYOUT (Min $10)'}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="bg-[#141414] p-4 rounded-xl border border-[#333]">
+                <div className="text-white/50 text-xs font-mono-code flex items-center justify-between">
+                  <span>CURATOR SPOTIFY FOLLOWS</span>
+                  <UserPlus className="w-4 h-4 text-[#1DB954]" />
+                </div>
+                <div className="text-3xl font-bold font-title text-white mt-2">+432</div>
+                <div className="text-[10px] text-emerald-400 font-mono-code mt-1">
+                  100% Real Spotify Users
+                </div>
+              </div>
+
+              <div className="bg-[#141414] p-4 rounded-xl border border-[#333]">
+                <div className="text-white/50 text-xs font-mono-code flex items-center justify-between">
+                  <span>PLAYLIST FOLLOWERS GAINED</span>
+                  <Radio className="w-4 h-4 text-[#1DB954]" />
+                </div>
+                <div className="text-3xl font-bold font-title text-white mt-2">+1,890</div>
+                <div className="text-[10px] text-emerald-400 font-mono-code mt-1">
+                  Direct Library Additions
+                </div>
+              </div>
+
+              <div className="bg-[#141414] p-4 rounded-xl border border-[#333]">
+                <div className="text-white/50 text-xs font-mono-code flex items-center justify-between">
+                  <span>FEATURED SONGS SAVED</span>
+                  <Heart className="w-4 h-4 text-[#BE1E2F]" />
+                </div>
+                <div className="text-3xl font-bold font-title text-white mt-2">+645</div>
+                <div className="text-[10px] text-emerald-400 font-mono-code mt-1">
+                  Boosts Algorithmic Reach
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-[#3a3a3a] space-y-3">
-            <h4 className="text-xs font-title tracking-wider text-white">STRIPE CONNECT STATUS</h4>
-            <div className="flex items-center justify-between text-xs font-mono-code">
-              <span className="text-white/60">Payout Destination:</span>
-              <strong className="text-emerald-400">Direct Deposit / Stripe Express Connected</strong>
-            </div>
-            <div className="flex items-center justify-between text-xs font-mono-code">
-              <span className="text-white/60">Auto-Payout Frequency:</span>
-              <span className="text-white">Every Monday (Weekly)</span>
+          {/* Platform Submission Credits Reward Section */}
+          <div className="card-sane p-6 rounded-2xl border border-[#3a3a3a] space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-title text-white flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-amber-400" />
+                  PLATFORM SUBMISSION CREDITS
+                </h4>
+                <p className="text-xs text-white/60 font-mono-code mt-1">
+                  For every verified review you complete, you receive platform credits that allow you to pitch your own releases or affiliate label tracks for free across the entire network.
+                </p>
+              </div>
+
+              <div className="text-right">
+                <div className="text-2xl font-bold font-mono-code text-white">
+                  {currentUser.creditBalance} Credits Available
+                </div>
+                <div className="text-[11px] text-emerald-400 font-mono-code">
+                  Zero Cash Fees Required
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -534,7 +620,7 @@ export const CuratorDashboard: React.FC = () => {
                   setSelectedSubForReview(null);
                   setReviewAction(null);
                 }}
-                className="text-white/60 hover:text-white"
+                className="text-white/60 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -608,10 +694,11 @@ export const CuratorDashboard: React.FC = () => {
               </button>
               <button
                 type="button"
+                disabled={isSubmittingReview}
                 onClick={handleConfirmReview}
-                className="btn-sane text-xs px-5 py-2.5 rounded-xl font-bold cursor-pointer"
+                className="btn-sane text-xs px-5 py-2.5 rounded-xl font-bold cursor-pointer disabled:opacity-50"
               >
-                Confirm Review & Send
+                {isSubmittingReview ? 'Sending Real-Time Decision...' : 'Confirm Review & Send'}
               </button>
             </div>
           </div>

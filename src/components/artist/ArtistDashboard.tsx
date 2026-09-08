@@ -167,12 +167,35 @@ export const ArtistDashboard: React.FC = () => {
 
           <button
             onClick={() => openPitchModal()}
-            className="btn-sane text-xs px-5 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/20"
+            className="btn-sane text-xs px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/30 hover:scale-[1.02] transition-transform"
           >
             <Sparkles className="w-4 h-4" />
-            PITCH NEW RELEASE
+            PITCH TRACK
           </button>
         </div>
+      </div>
+
+      {/* Hero Pitch Track Callout Option */}
+      <div className="card-sane p-6 rounded-2xl border border-[#BE1E2F]/40 bg-gradient-to-r from-[#241719] via-[#1a1a1a] to-[#1a1a1a] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-mono-code text-[#BE1E2F] font-bold">
+            <Zap className="w-4 h-4 fill-current" />
+            <span>ARTIST CAMPAIGN HUB</span>
+          </div>
+          <h2 className="text-xl font-title font-bold text-white">
+            PITCH YOUR TRACK TO SPOTIFY PLAYLIST CURATORS
+          </h2>
+          <p className="text-xs text-white/60 font-mono-code max-w-2xl leading-relaxed">
+            Submit your unreleased cuts or latest releases directly to verified tastemakers. Choose free submissions with completed follower gates or guaranteed 48-hour premium review.
+          </p>
+        </div>
+        <button
+          onClick={() => openPitchModal()}
+          className="btn-sane text-xs px-6 py-3.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-xl shadow-[#BE1E2F]/30 whitespace-nowrap"
+        >
+          <Music2 className="w-4 h-4" />
+          PITCH TRACK NOW
+        </button>
       </div>
 
       {/* Metrics Row */}
@@ -769,7 +792,7 @@ export const ArtistDashboard: React.FC = () => {
 
           <div>
             <h3 className="text-xs font-title tracking-wider text-white mb-3">
-              TRANSACTION HISTORY & STRIPE RECEIPTS
+              TRANSACTION HISTORY & PAYPAL RECEIPTS
             </h3>
             <div className="card-sane rounded-xl border border-[#3a3a3a] divide-y divide-[#3a3a3a]/60">
               {transactions.length === 0 ? (
@@ -793,6 +816,9 @@ export const ArtistDashboard: React.FC = () => {
                         <div className="text-white font-bold">{tx.description}</div>
                         <div className="text-[10px] text-white/40">
                           {new Date(tx.createdAt).toLocaleString()} • ID: {tx.id}
+                          {tx.paypalOrderId && (
+                            <span className="text-[#0070BA] ml-2">Order: {tx.paypalOrderId}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -805,9 +831,9 @@ export const ArtistDashboard: React.FC = () => {
                       >
                         {tx.amount > 0 ? `+${tx.amount}` : tx.amount} Credits
                       </div>
-                      {tx.stripeAmountUsd && (
-                        <div className="text-[10px] text-white/50 font-mono-code">
-                          ${tx.stripeAmountUsd.toFixed(2)} USD via Stripe
+                      {tx.paypalAmountUsd && (
+                        <div className="text-[10px] text-[#0070BA] font-mono-code flex items-center justify-end gap-1">
+                          <span>${tx.paypalAmountUsd.toFixed(2)} USD via PayPal</span>
                         </div>
                       )}
                     </div>

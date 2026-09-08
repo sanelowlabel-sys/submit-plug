@@ -19,7 +19,7 @@ import { OnboardPlaylistModal } from './components/modals/OnboardPlaylistModal';
 import { GlobalAudioPlayer } from './components/player/GlobalAudioPlayer';
 
 const MainContent: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, activeRole } = useApp();
 
   return (
     <main className="min-h-screen bg-[#1a1a1a] text-white flex flex-col justify-between pb-24">
@@ -38,6 +38,10 @@ const MainContent: React.FC = () => {
           <div className="space-y-8">
             <MarketplaceView />
           </div>
+        )}
+
+        {activeTab === 'dashboard' && (
+          activeRole === 'curator' ? <CuratorDashboard /> : <ArtistDashboard />
         )}
 
         {(activeTab === 'artist' || (activeTab as string) === 'artist_dashboard') && <ArtistDashboard />}

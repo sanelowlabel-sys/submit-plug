@@ -53,96 +53,124 @@ export const Navbar: React.FC = () => {
             <BrandLogo size={42} />
           </button>
 
-          {/* Navigation Links */}
+          {/* Navigation Links in exact requested order */}
           <nav className="hidden lg:flex items-center gap-1">
             <button
-              id="nav-link-marketplace"
-              onClick={() => setActiveTab('marketplace')}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'marketplace' || activeTab === 'home'
+              id="nav-link-home"
+              onClick={() => setActiveTab('home')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'home'
                   ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
                   : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
               }`}
             >
-              <Radio className="w-4 h-4" />
-              Explore Playlists
+              Home
             </button>
 
             <button
-              id="nav-link-artist"
+              id="nav-link-explore"
+              onClick={() => setActiveTab('marketplace')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'marketplace'
+                  ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
+                  : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              Explore
+            </button>
+
+            <button
+              id="nav-link-artist-hub"
               onClick={() => {
                 switchUserRole('artist');
                 setActiveTab('artist');
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'artist'
                   ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
                   : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
               }`}
             >
-              <Music2 className="w-4 h-4" />
-              Artist Hub
+              <Music2 className="w-3.5 h-3.5" />
+              Artists Hub
             </button>
 
             <button
-              id="nav-link-curator"
+              id="nav-link-curator-hub"
               onClick={() => {
                 switchUserRole('curator');
                 setActiveTab('curator');
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'curator'
                   ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
                   : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
               }`}
             >
-              <ListMusic className="w-4 h-4" />
-              Curator Portal
+              <ListMusic className="w-3.5 h-3.5" />
+              Curator Hub
             </button>
 
-            <button
-              id="nav-link-profile"
-              onClick={() => {
-                setActiveTab('profile');
-              }}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'profile'
-                  ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
-                  : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              Profile
-            </button>
+            {/* Dashboard for logged in users */}
+            {currentUser && (
+              <button
+                id="nav-link-dashboard"
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard'
+                    ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
+                    : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
+                }`}
+              >
+                Dashboard
+              </button>
+            )}
+
+            {/* Profile for logged in users */}
+            {currentUser && (
+              <button
+                id="nav-link-profile"
+                onClick={() => setActiveTab('profile')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'profile'
+                    ? 'bg-[#BE1E2F] text-white font-semibold shadow-md shadow-[#BE1E2F]/30'
+                    : 'text-white/80 hover:text-white hover:bg-[#2b2b2b]'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                Profile
+              </button>
+            )}
           </nav>
         </div>
 
-        {/* Right Action Tools */}
+        {/* Right Action Tools: Wallet, Notifications, then Avatar */}
         <div className="flex items-center gap-3">
-          {/* Quick Pitch CTA Button (for Artist) */}
+          {/* Quick Pitch CTA */}
           <button
             id="nav-pitch-quick-btn"
             onClick={() => openPitchModal()}
-            className="hidden sm:inline-flex btn-sane text-xs px-3.5 py-1.5 rounded-lg font-bold gap-1.5 shadow-lg shadow-[#BE1E2F]/20 cursor-pointer"
+            className="hidden xl:inline-flex btn-sane text-xs px-3 py-1.5 rounded-lg font-bold gap-1.5 shadow-lg shadow-[#BE1E2F]/20 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             Pitch Track
           </button>
 
-          {/* Credit Wallet Counter */}
+          {/* Wallet */}
           <div
             id="nav-credit-wallet"
             onClick={() => setBuyCreditsModalOpen(true)}
             className="card-sane px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer hover:border-[#BE1E2F] transition-colors group"
-            title="Click to top up your Submit Plug credits"
+            title="Wallet: Click to top up your Submit Plug credits"
           >
             <div className="w-6 h-6 rounded-full bg-[#BE1E2F]/20 flex items-center justify-center text-[#BE1E2F] group-hover:bg-[#BE1E2F] group-hover:text-white transition-colors">
               <Coins className="w-3.5 h-3.5" />
             </div>
             <div>
-              <div className="text-[10px] text-white/50 font-mono-code leading-none">CREDITS</div>
-              <div className="text-sm font-bold text-white font-mono-code leading-tight flex items-center gap-1">
-                {currentUser.creditBalance}
+              <div className="text-[10px] text-white/50 font-mono-code leading-none">WALLET</div>
+              <div className="text-xs font-bold text-white font-mono-code leading-tight flex items-center gap-1">
+                {currentUser.creditBalance} CR
                 <span className="text-[10px] text-[#BE1E2F] font-bold group-hover:translate-x-0.5 transition-transform">+</span>
               </div>
             </div>
@@ -298,15 +326,23 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Sub-Navigation Bar (No SQL/Firebase) */}
-      <div className="lg:hidden flex items-center justify-around border-t border-[#3a3a3a] bg-[#1a1a1a] px-2 py-2 text-xs">
+      {/* Mobile Sub-Navigation Bar */}
+      <div className="lg:hidden flex items-center overflow-x-auto scrollbar-none border-t border-[#3a3a3a] bg-[#1a1a1a] px-3 py-2 text-xs gap-1.5 justify-start">
         <button
-          onClick={() => setActiveTab('marketplace')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded ${
-            activeTab === 'marketplace' || activeTab === 'home' ? 'text-[#BE1E2F] font-bold' : 'text-white/70'
+          onClick={() => setActiveTab('home')}
+          className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+            activeTab === 'home' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
           }`}
         >
-          <Radio className="w-4 h-4" />
+          <span>Home</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('marketplace')}
+          className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+            activeTab === 'marketplace' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" />
           <span>Explore</span>
         </button>
         <button
@@ -314,36 +350,55 @@ export const Navbar: React.FC = () => {
             switchUserRole('artist');
             setActiveTab('artist');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded ${
-            activeTab === 'artist' ? 'text-[#BE1E2F] font-bold' : 'text-white/70'
+          className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+            activeTab === 'artist' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
           }`}
         >
-          <Music2 className="w-4 h-4" />
-          <span>Artist Hub</span>
+          <Music2 className="w-3.5 h-3.5" />
+          <span>Artists Hub</span>
         </button>
         <button
           onClick={() => {
             switchUserRole('curator');
             setActiveTab('curator');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded ${
-            activeTab === 'curator' ? 'text-[#BE1E2F] font-bold' : 'text-white/70'
+          className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+            activeTab === 'curator' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
           }`}
         >
-          <ListMusic className="w-4 h-4" />
-          <span>Curator Portal</span>
+          <ListMusic className="w-3.5 h-3.5" />
+          <span>Curator Hub</span>
         </button>
-        <button
-          onClick={() => {
-            setActiveTab('profile');
-          }}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded ${
-            activeTab === 'profile' ? 'text-[#BE1E2F] font-bold' : 'text-white/70'
-          }`}
-        >
-          <User className="w-4 h-4" />
-          <span>Profile</span>
-        </button>
+        {currentUser && (
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+              activeTab === 'dashboard' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <span>Dashboard</span>
+          </button>
+        )}
+        {currentUser && (
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer ${
+              activeTab === 'profile' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Profile</span>
+          </button>
+        )}
+        {currentUser && (
+          <button
+            onClick={() => setBuyCreditsModalOpen(true)}
+            className="flex items-center gap-1 py-1.5 px-3 rounded-lg whitespace-nowrap cursor-pointer text-amber-400 bg-[#2b2b2b] border border-[#3a3a3a]"
+          >
+            <Coins className="w-3.5 h-3.5" />
+            <span>Wallet ({currentUser.creditBalance})</span>
+          </button>
+        )}
       </div>
     </header>
   );

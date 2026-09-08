@@ -1,5 +1,13 @@
 export type UserRole = 'artist' | 'curator' | 'admin';
 
+export interface CuratorGatesConfig {
+  requireCuratorFollow: boolean;
+  requirePlaylistFollow: boolean;
+  requireSongSave: boolean;
+  curatorSpotifyProfileUrl?: string;
+  targetSongSpotifyUrl?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -10,8 +18,10 @@ export interface UserProfile {
   spotifyUri?: string;
   spotifyFollowers?: number;
   bio: string;
-  creditBalance: number;
-  earningsBalance: number; // in USD for curators
+  creditBalance: number; // premium credits
+  freeWeeklyCredits: number; // free weekly allowance
+  lastWeeklyReset?: string;
+  earningsBalance?: number; // legacy (curators do not receive cash payouts)
   verifiedStatus: boolean;
   totalSubmissions: number;
   totalPlacements: number;
@@ -58,6 +68,8 @@ export interface Playlist {
   isFeatured?: boolean;
   acceptingSubmissions: boolean;
   recentAddedTracks?: Track[];
+  gates?: CuratorGatesConfig;
+  lastActiveAt?: string;
 }
 
 export type PitchType = 'free' | 'premium';
@@ -84,6 +96,11 @@ export interface Submission {
   reviewedAt?: string;
   spotlightListenedDuration?: number;
   spotifyPlacementUrl?: string;
+  gateActionsCompleted?: {
+    followedCurator?: boolean;
+    followedPlaylist?: boolean;
+    savedSong?: boolean;
+  };
 }
 
 export interface CreditTransaction {
@@ -91,11 +108,53 @@ export interface CreditTransaction {
   userId: string;
   userName: string;
   amount: number; // positive or negative
-  type: 'purchase' | 'free_pitch' | 'premium_pitch' | 'curator_reward' | 'admin_bonus';
+  type: 'purchase' | 'free_pitch' | 'premium_pitch' | 'weekly_credit_reset' | 'curator_gate_reward' | 'admin_bonus';
   description: string;
   createdAt: string;
   status: 'completed' | 'pending';
-  stripeAmountUsd?: number;
+  paypalAmountUsd?: number;
+  paypalOrderId?: string;
+  paypalPayerEmail?: string;
+}
+
+export interface SupabaseStatusInfo {
+  projectUrl: string;
+  connected: boolean;
+  isConfigured: boolean;
+  tables: {
+    name: string;
+    description: string;
+    syncedCount: number;
+    lastSyncedAt?: string;
+  }[];
+}
+
+export interface EmailLog {
+  id: string;
+  to: string;
+  subject: string;
+  template: 'new_submission_curator' | 'submission_approved_artist' | 'submission_declined_artist';
+  recipientRole: 'artist' | 'curator';
+  trackTitle: string;
+  playlistTitle: string;
+  curatorName: string;
+  artistName: string;
+  html: string;
+  status: 'sent' | 'delivered';
+  sentAt: string;
+}
+
+export interface CuratorActivityEvent {
+  id: string;
+  curatorId: string;
+  curatorName: string;
+  curatorAvatar: string;
+  action: 'reviewed' | 'approved' | 'declined' | 'added_playlist' | 'came_online';
+  playlistTitle: string;
+  trackTitle?: string;
+  timestamp: string;
+  approvalRate?: number;
+  avgResponseHours?: number;
 }
 
 export interface CuratorVerificationApplication {
@@ -118,7 +177,7 @@ export interface AppNotification {
   userId: string;
   title: string;
   message: string;
-  type: 'placement_success' | 'pitch_declined' | 'credits_added' | 'new_submission' | 'curator_verified';
+  type: 'placement_success' | 'pitch_declined' | 'credits_added' | 'new_submission' | 'curator_verified' | 'gate_reward';
   createdAt: string;
   read: boolean;
   actionUrl?: string;
@@ -134,4 +193,5 @@ export interface CreditPackage {
   features: string[];
 }
 
-export type ActiveTab = 'home' | 'marketplace' | 'artist' | 'curator' | 'profile';
+export type ActiveTab = 'home' | 'marketplace' | 'artist' | 'curator' | 'profile' | 'emails' | 'dashboard';
+

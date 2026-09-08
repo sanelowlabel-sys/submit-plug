@@ -268,25 +268,51 @@ export const MarketplaceView: React.FC = () => {
         {/* Playlists Grid */}
         <div className="lg:col-span-3">
           {filteredPlaylists.length === 0 ? (
-            <div className="card-sane p-12 text-center rounded-xl border border-[#3a3a3a]">
-              <Radio className="w-12 h-12 text-white/20 mx-auto mb-3" />
-              <h3 className="text-lg font-title text-white">No playlists match your filters</h3>
-              <p className="text-xs text-white/60 font-mono-code mt-1">
-                Try widening your follower filter or clearing genre tags.
-              </p>
-              <button
-                onClick={() => {
-                  setSelectedGenre('All');
-                  setMinFollowers(0);
-                  setOnlyFreePitch(false);
-                  setOnlyVerified(false);
-                  setMaxResponseHours(72);
-                  setSearchQuery('');
-                }}
-                className="btn-sane text-xs px-4 py-2 rounded-lg font-bold mt-4"
-              >
-                Reset All Filters
-              </button>
+            <div className="card-sane p-12 text-center rounded-2xl border border-[#3a3a3a] space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#BE1E2F]/15 text-[#BE1E2F] flex items-center justify-center mx-auto">
+                <Radio className="w-8 h-8" />
+              </div>
+              {playlists.length === 0 ? (
+                <>
+                  <h3 className="text-xl font-title font-bold text-white">
+                    REAL-TIME PLAYLIST DIRECTORY AWAITING CURATORS
+                  </h3>
+                  <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto leading-relaxed">
+                    Demo data has been cleared. Only authentic Spotify playlists submitted by curators in real time will appear here.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        useApp().switchUserRole('curator');
+                        useApp().setOnboardPlaylistModalOpen(true);
+                      }}
+                      className="btn-sane text-xs px-6 py-3 rounded-xl font-bold inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+                    >
+                      <Sparkles className="w-4 h-4" /> SUBMIT PLAYLIST AS CURATOR
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-title text-white">No playlists match your filters</h3>
+                  <p className="text-xs text-white/60 font-mono-code mt-1">
+                    Try widening your follower filter or clearing genre tags.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSelectedGenre('All');
+                      setMinFollowers(0);
+                      setOnlyFreePitch(false);
+                      setOnlyVerified(false);
+                      setMaxResponseHours(72);
+                      setSearchQuery('');
+                    }}
+                    className="btn-sane text-xs px-4 py-2 rounded-lg font-bold mt-2"
+                  >
+                    Reset All Filters
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

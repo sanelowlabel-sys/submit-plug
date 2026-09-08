@@ -1,0 +1,19 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Rounded Shield -->
+  <rect x="4" y="4" width="92" height="92" rx="24" fill="#141414" stroke="#BE1E2F" stroke-width="3"/>
+  <!-- Concentric Vinyl Grooves -->
+  <circle cx="50" cy="50" r="38" stroke="#3a3a3a" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.6"/>
+  <circle cx="50" cy="50" r="30" stroke="#3a3a3a" stroke-width="1.5" opacity="0.4"/>
+  <circle cx="50" cy="50" r="22" stroke="#BE1E2F" stroke-width="1.5" opacity="0.4"/>
+  <!-- Glowing Center Hub -->
+  <circle cx="50" cy="50" r="14" fill="#BE1E2F"/>
+  <!-- Top plug prongs -->
+  <rect x="36" y="22" width="6" height="14" rx="3" fill="#ffffff"/>
+  <rect x="58" y="22" width="6" height="14" rx="3" fill="#ffffff"/>
+  <!-- Plug Body -->
+  <path d="M32 34C32 31.7909 33.7909 30 36 30H64C66.2091 30 68 31.7909 68 34V46C68 55.9411 59.9411 64 50 64C40.0589 64 32 55.9411 32 46V34Z" fill="#ffffff"/>
+  <!-- Lightning Soundwave Bolt -->
+  <path d="M52 36L42 49H49L47 60L58 46H50L52 36Z" fill="#BE1E2F"/>
+  <!-- Plug Cord -->
+  <path d="M50 64V76M44 76C44 79 46.5 82 50 82C53.5 82 56 79 56 76" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+</svg>
