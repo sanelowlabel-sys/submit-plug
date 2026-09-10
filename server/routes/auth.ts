@@ -70,15 +70,20 @@ authRouter.get('/me', (req: Request, res: Response) => {
     user = db.getUserById(userId);
   }
 
-  // Fallback to first user in database
+  // If no auth provided, return null for guest state
   if (!user) {
-    user = db.getUsers()[0];
+    return res.json({ user: null });
   }
 
   // Check weekly reset on fetch
   db.checkWeeklyCreditsReset();
 
   res.json({ user });
+});
+
+// Logout endpoint
+authRouter.post('/logout', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 // Update profile

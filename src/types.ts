@@ -195,3 +195,36 @@ export interface CreditPackage {
 
 export type ActiveTab = 'home' | 'marketplace' | 'artist' | 'curator' | 'profile' | 'emails' | 'dashboard';
 
+export interface ToastNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  timestamp: number;
+  durationMs?: number;
+}
+
+export type SpotifyItemType = 'track' | 'playlist' | 'album' | 'artist';
+
+export interface SpotifyParsedMetadata {
+  id: string;
+  type: SpotifyItemType;
+  title: string;
+  artist: string;
+  creatorName?: string;
+  coverArt: string;
+  spotifyUrl: string;
+  spotifyUri: string;
+  embedUrl: string;
+  durationSec?: number;
+  durationFormatted?: string;
+  releaseDate?: string;
+  releaseYear?: string;
+  previewUrl?: string;
+  trackCount?: number;
+  followerCount?: number;
+  genres?: string[];
+  rawEmbedHtml?: string;
+}
+
+

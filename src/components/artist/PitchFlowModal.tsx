@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Track, Playlist, PitchType } from '../../types';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   X,
   Music2,
@@ -18,7 +19,8 @@ import {
   ExternalLink,
   UserPlus,
   Radio,
-  Heart
+  Heart,
+  LogIn
 } from 'lucide-react';
 import { globalAudioEngine } from '../../utils/audioEngine';
 
@@ -35,7 +37,9 @@ export const PitchFlowModal: React.FC = () => {
     freeWeeklyCredits,
     setBuyCreditsModalOpen,
     playTrack,
-    verifyGateAction
+    verifyGateAction,
+    openLoginModal,
+    openRegisterModal
   } = useApp();
 
   const [step, setStep] = useState<'select_track' | 'configure_pitch' | 'success'>('select_track');
@@ -98,7 +102,7 @@ export const PitchFlowModal: React.FC = () => {
   };
 
   const cost = pitchType === 'premium' ? (targetPlaylist.pitchCostCredits || 1) : 0;
-  const hasEnoughCredits = currentUser.creditBalance >= cost;
+  const hasEnoughCredits = (currentUser?.creditBalance ?? 0) >= cost;
   const isFreeSpotlightComplete = spotlightElapsedSec >= SPOTLIGHT_REQUIRED_SEC;
 
   // Gate check for free pitches
@@ -232,15 +236,18 @@ export const PitchFlowModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="card-sane w-full max-w-2xl rounded-2xl border border-[#3a3a3a] shadow-2xl overflow-hidden my-8">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1a1a1a]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#BE1E2F] flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
+      <div className="card-sane w-full max-w-2xl rounded-2xl border border-[#3a3a3a] shadow-2xl overflow-hidden my-8 bg-[#161616]">
+        {/* Header with Brand Logo */}
+        <div className="px-6 py-4 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1f1f1f]">
+          <div className="flex items-center gap-3">
+            <BrandLogo size={36} withBadge={false} alt="Brand Logo" />
             <div>
-              <h3 className="text-base font-title text-white">SUBMIT TRACK PITCH</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-title font-bold text-white tracking-wide">SUBMIT TRACK PITCH</h3>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-code font-bold bg-[#BE1E2F]/20 text-[#BE1E2F] border border-[#BE1E2F]/30">
+                  REAL-TIME
+                </span>
+              </div>
               <div className="text-[11px] font-mono-code text-white/50">
                 Direct Submission to Spotify Curators
               </div>
@@ -252,13 +259,50 @@ export const PitchFlowModal: React.FC = () => {
               closePitchModal();
             }}
             className="w-8 h-8 rounded-lg bg-[#2b2b2b] border border-[#3a3a3a] text-white/60 hover:text-white flex items-center justify-center cursor-pointer"
+            aria-label="Close modal"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Content */}
-        <div className="p-6">
+        {!currentUser ? (
+          <div className="p-8 text-center space-y-5">
+            <div className="flex justify-center">
+              <BrandLogo size={60} alt="Brand Logo" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-lg font-title font-bold text-white tracking-wide">
+                AUTHENTICATION REQUIRED TO PITCH
+              </h4>
+              <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto">
+                Please sign in to submit your track to <span className="text-white font-bold">{targetPlaylist.title}</span> and track curator reviews in real-time.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  closePitchModal();
+                  openLoginModal();
+                }}
+                className="w-full sm:w-auto btn-sane px-6 py-2.5 rounded-xl font-title font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+              >
+                <LogIn className="w-4 h-4" />
+                SIGN IN NOW
+              </button>
+              <button
+                onClick={() => {
+                  closePitchModal();
+                  openRegisterModal();
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-title font-bold text-xs bg-[#242424] text-white border border-[#3a3a3a] hover:border-[#BE1E2F] transition-colors cursor-pointer"
+              >
+                CREATE ARTIST ACCOUNT
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6">
           {step === 'select_track' && (
             <div className="space-y-5">
               {/* Target Playlist Banner */}
@@ -686,6 +730,7 @@ export const PitchFlowModal: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

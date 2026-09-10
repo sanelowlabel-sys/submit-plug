@@ -187,6 +187,12 @@ class AudioEngine {
       this.currentAudio.volume = Math.max(0, Math.min(1, volume));
     }
   }
+
+  public seek(time: number) {
+    if (this.currentAudio && !isNaN(this.currentAudio.duration)) {
+      this.currentAudio.currentTime = Math.max(0, Math.min(this.currentAudio.duration, time));
+    }
+  }
 }
 
 export const globalAudioEngine = new AudioEngine();

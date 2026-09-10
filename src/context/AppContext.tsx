@@ -13,22 +13,43 @@ import {
   ActiveTab,
   EmailLog,
   CuratorActivityEvent,
-  CuratorGatesConfig
+  CuratorGatesConfig,
+  ToastNotification,
+  SpotifyParsedMetadata
 } from '../types';
 import { globalAudioEngine } from '../utils/audioEngine';
+import { fetchSpotifyMetadata, convertSpotifyMetadataToTrack, parseSpotifyUrl } from '../utils/spotifyParser';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 
-interface AudioState {
+export interface AudioState {
   currentTrack: Track | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   playlistContext?: string;
+  activeSpotifyType?: 'track' | 'playlist' | 'album' | 'artist';
+  activeSpotifyId?: string;
+  embedUrl?: string;
+  isEmbedExpanded?: boolean;
+  isMuted?: boolean;
+  volume?: number;
+  parsedMetadata?: SpotifyParsedMetadata | null;
 }
 
 interface AppContextType {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
+  isAuthenticated: boolean;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, role: UserRole, password?: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  authModalOpen: boolean;
+  setAuthModalOpen: (open: boolean) => void;
+  authModalMode: 'login' | 'register';
+  setAuthModalMode: (mode: 'login' | 'register') => void;
+  openLoginModal: () => void;
+  openRegisterModal: () => void;
+
   activeRole: UserRole;
   switchUserRole: (role: UserRole) => void;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
@@ -91,11 +112,19 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
 
-  // Audio Engine
+  // Audio Engine & Spotify Playback
   audioState: AudioState;
   playTrack: (track: Track, playlistContext?: string) => void;
   pauseTrack: () => void;
+  resumeTrack: () => void;
   stopAudio: () => void;
+  seekAudio: (seconds: number) => void;
+  setVolume: (vol: number) => void;
+  toggleMute: () => void;
+  toggleEmbedExpanded: () => void;
+  playSpotifyUrl: (urlOrUri: string, contextTitle?: string) => Promise<boolean>;
+  playNextTrack: () => void;
+  playPreviousTrack: () => void;
 
   // Modals
   pitchModalOpen: boolean;
@@ -117,6 +146,11 @@ interface AppContextType {
   liveActiveCuratorsCount: number;
   recentLivePlacement: { artist: string; track: string; playlist: string; position: number } | null;
   isWsConnected: boolean;
+
+  // Real-time toast notifications
+  toasts: ToastNotification[];
+  showToast: (title: string, message: string, type?: 'success' | 'error' | 'info' | 'warning', durationMs?: number) => void;
+  removeToast: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -126,24 +160,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [isWsConnected, setIsWsConnected] = useState(false);
 
+  // Auth modal states
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+
+  const openLoginModal = () => {
+    setAuthModalMode('login');
+    setAuthModalOpen(true);
+  };
+
+  const openRegisterModal = () => {
+    setAuthModalMode('register');
+    setAuthModalOpen(true);
+  };
+
   // User state
-  const [currentUser, setCurrentUser] = useState<UserProfile>({
-    id: 'usr_sanelow_1',
-    name: 'Sane Low Label',
-    email: 'SanelowLabel@gmail.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
-    role: 'artist',
-    spotifyId: 'sanelowlabel',
-    spotifyUri: 'https://open.spotify.com/user/sanelowlabel',
-    spotifyFollowers: 85400,
-    bio: 'Official Sane Low Label Hub. Direct Spotify playlist curation, organic artist pitching, and global sound discovery.',
-    creditBalance: 25,
-    freeWeeklyCredits: 2,
-    verifiedStatus: true,
-    totalSubmissions: 12,
-    totalPlacements: 8,
-    createdAt: new Date().toISOString()
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    // Check if user explicitly logged out previously
+    if (typeof window !== 'undefined' && localStorage.getItem('submitplug_logged_out') === 'true') {
+      return null;
+    }
+    return {
+      id: 'usr_sanelow_1',
+      name: 'Sane Low Label',
+      email: 'SanelowLabel@gmail.com',
+      avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
+      role: 'artist',
+      spotifyId: 'sanelowlabel',
+      spotifyUri: 'https://open.spotify.com/user/sanelowlabel',
+      spotifyFollowers: 85400,
+      bio: 'Official Sane Low Label Hub. Direct Spotify playlist curation, organic artist pitching, and global sound discovery.',
+      creditBalance: 25,
+      freeWeeklyCredits: 2,
+      verifiedStatus: true,
+      totalSubmissions: 12,
+      totalPlacements: 8,
+      createdAt: new Date().toISOString()
+    };
   });
+
+  const isAuthenticated = Boolean(currentUser);
 
   // Core Data Lists
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -177,14 +233,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     position: 4
   });
 
-  // Audio state
+  // Audio state with pre-configured Spotify featured track
   const [audioState, setAudioState] = useState<AudioState>({
-    currentTrack: null,
+    currentTrack: {
+      id: 'spot_featured_1',
+      title: 'Neon Horizon',
+      artist: 'Velvet Echoes',
+      albumArt: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80',
+      spotifyUrl: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+      spotifyUri: 'spotify:track:4cOdK2wGLETKBW3PvgPWqT',
+      previewUrl: '',
+      durationSec: 214,
+      genre: 'Synthwave',
+      releaseDate: '2024'
+    },
     isPlaying: false,
     currentTime: 0,
-    duration: 30,
-    playlistContext: undefined
+    duration: 214,
+    playlistContext: 'Synthwave & Cyber Retrowave',
+    activeSpotifyType: 'track',
+    activeSpotifyId: '4cOdK2wGLETKBW3PvgPWqT',
+    embedUrl: 'https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT?utm_source=generator&theme=0',
+    isEmbedExpanded: false,
+    volume: 0.8,
+    isMuted: false
   });
+
+  // Global Toast Notifications
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const showToast = useCallback((
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning' = 'info',
+    durationMs = 4500
+  ) => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newToast: ToastNotification = {
+      id,
+      title,
+      message,
+      type,
+      timestamp: Date.now(),
+      durationMs
+    };
+    setToasts(prev => [...prev.slice(-3), newToast]);
+
+    setTimeout(() => {
+      removeToast(id);
+    }, durationMs);
+  }, [removeToast]);
 
   // 1. Initial Load from Backend API
   const fetchAllInitialData = useCallback(async () => {
@@ -318,7 +420,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-          if (payload.eventType === 'UPDATE' && payload.new && payload.new.id === currentUser.id) {
+          if (payload.eventType === 'UPDATE' && payload.new && payload.new.id === currentUser?.id) {
             setCurrentUser(prev => ({ ...prev, ...payload.new }));
           }
         })
@@ -348,8 +450,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const { type, payload } = msg;
 
     if (type === 'USER_UPDATED' && payload) {
-      if (payload.id === currentUser.id) {
-        setCurrentUser(prev => ({ ...prev, ...payload }));
+      if (currentUser && payload.id === currentUser.id) {
+        setCurrentUser(prev => (prev ? { ...prev, ...payload } : null));
       }
     }
 
@@ -365,8 +467,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [newSub, ...prev];
       });
 
+      // Real-time toast broadcast to all active users
+      showToast(
+        '🎵 New Track Pitch Submitted',
+        `${newSub.artistName} pitched "${newSub.track.title}" to ${newSub.playlistTitle}`,
+        'info'
+      );
+
       // If this was targeted to current curator or submitted by current artist
-      if (newSub.curatorId === currentUser.id) {
+      if (currentUser && newSub.curatorId === currentUser.id) {
         setNotifications(prev => [
           {
             id: `notif_${Date.now()}`,
@@ -398,7 +507,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           position: 4
         });
 
-        if (updatedSub.artistId === currentUser.id) {
+        showToast(
+          '🚀 Track Placement Approved!',
+          `"${updatedSub.track.title}" by ${updatedSub.artistName} was approved on "${updatedSub.playlistTitle}"!`,
+          'success'
+        );
+
+        if (currentUser && updatedSub.artistId === currentUser.id) {
           try {
             confetti({
               particleCount: 120,
@@ -423,16 +538,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...prev
           ]);
         }
+      } else if (updatedSub.status === 'declined') {
+        if (currentUser && updatedSub.artistId === currentUser.id) {
+          showToast(
+            'Curator Review Completed',
+            `Feedback has been provided for "${updatedSub.track.title}"`,
+            'info'
+          );
+        }
       }
     }
 
     if (type === 'WALLET_UPDATED' && payload.wallet) {
-      if (!payload.userId || payload.userId === currentUser.id) {
-        setCurrentUser(prev => ({
+      if (currentUser && (!payload.userId || payload.userId === currentUser.id)) {
+        setCurrentUser(prev => (prev ? {
           ...prev,
           creditBalance: payload.wallet.creditBalance ?? prev.creditBalance,
           freeWeeklyCredits: payload.wallet.freeWeeklyCredits ?? prev.freeWeeklyCredits
-        }));
+        } : null));
         if (payload.wallet.transaction) {
           setTransactions(prev => [payload.wallet.transaction, ...prev]);
         }
@@ -443,19 +566,125 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCuratorActivities(prev => [payload, ...prev.slice(0, 49)]);
     }
 
-    if (type === 'PLAYLIST_CREATED') {
-      setPlaylists(prev => [payload, ...prev]);
+    if (type === 'PLAYLIST_CREATED' && payload) {
+      setPlaylists(prev => {
+        const exists = prev.some(p => p.id === payload.id);
+        if (exists) return prev;
+        return [payload, ...prev];
+      });
+
+      showToast(
+        '🎧 New Spotify Playlist Live!',
+        `"${payload.title}" by ${payload.curatorName} is now accepting pitches in real-time`,
+        'success'
+      );
     }
 
-    if (type === 'PLAYLIST_UPDATED') {
-      setPlaylists(prev => prev.map(p => (p.id === payload.id ? payload : p)));
+    if (type === 'PLAYLIST_UPDATED' && payload) {
+      setPlaylists(prev => prev.map(p => (p.id === payload.id ? { ...p, ...payload } : p)));
+      showToast(
+        'Playlist Synchronized',
+        `"${payload.title}" details updated in real-time`,
+        'info'
+      );
+    }
+  };
+
+  // Auth Functions
+  const login = async (email: string, password = 'password123'): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.user) {
+        return { success: false, error: data.error || 'Failed to sign in' };
+      }
+      setCurrentUser(data.user);
+      setActiveRole(data.user.role || 'artist');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('submitplug_token', data.token || `token_${data.user.id}`);
+        localStorage.setItem('submitplug_user_id', data.user.id);
+        localStorage.removeItem('submitplug_logged_out');
+      }
+      setAuthModalOpen(false);
+
+      try {
+        confetti({ particleCount: 60, spread: 50, origin: { y: 0.5 } });
+      } catch {}
+
+      showToast(
+        'Signed In Successfully',
+        `Welcome back, ${data.user.name}! Real-time sessions are live.`,
+        'success'
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Login network error' };
+    }
+  };
+
+  const register = async (name: string, email: string, role: UserRole, password = 'password123'): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.user) {
+        return { success: false, error: data.error || 'Registration failed' };
+      }
+      setCurrentUser(data.user);
+      setActiveRole(role);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('submitplug_token', data.token || `token_${data.user.id}`);
+        localStorage.setItem('submitplug_user_id', data.user.id);
+        localStorage.removeItem('submitplug_logged_out');
+      }
+      setAuthModalOpen(false);
+
+      try {
+        confetti({ particleCount: 90, spread: 60, origin: { y: 0.5 } });
+      } catch {}
+
+      showToast(
+        'Account Registered!',
+        `Welcome to Submit Plug, ${data.user.name}! Your account is active.`,
+        'success'
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Registration network error' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('submitplug_token');
+      localStorage.removeItem('submitplug_user_id');
+      localStorage.setItem('submitplug_logged_out', 'true');
+    }
+    setCurrentUser(null);
+    showToast('Signed Out', 'You have been safely signed out of your account.', 'info');
+    if (activeTab === 'curator' || activeTab === 'profile') {
+      setActiveTab('home');
     }
   };
 
   // Switch role helper
   const switchUserRole = (role: UserRole) => {
     setActiveRole(role);
-    setCurrentUser(prev => ({ ...prev, role }));
+    if (currentUser) {
+      setCurrentUser(prev => (prev ? { ...prev, role } : null));
+    }
     if (role === 'artist') setActiveTab('artist');
     else if (role === 'curator') setActiveTab('curator');
     else if (role === 'admin') setActiveTab('profile');
@@ -463,6 +692,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Update profile via API
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    if (!currentUser) return;
     try {
       const res = await fetch('/api/auth/update-profile', {
         method: 'POST',
@@ -477,7 +707,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } catch (err) {
       console.warn('[AppContext] Profile update error:', err);
-      setCurrentUser(prev => ({ ...prev, ...updates }));
+      setCurrentUser(prev => (prev ? { ...prev, ...updates } : null));
     }
   };
 
@@ -494,6 +724,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       savedSong?: boolean;
     };
   }): Promise<{ success: boolean; message: string }> => {
+    if (!currentUser) {
+      openLoginModal();
+      return { success: false, message: 'Please sign in to pitch your music.' };
+    }
+
     const targetPlaylist = playlists.find(p => p.id === data.playlistId);
     if (!targetPlaylist) {
       return { success: false, message: 'Target playlist not found' };
@@ -538,16 +773,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Update local wallet directly from server response
       if (resData.wallet) {
-        setCurrentUser(prev => ({
+        setCurrentUser(prev => (prev ? {
           ...prev,
           creditBalance: resData.wallet.creditBalance ?? prev.creditBalance,
           freeWeeklyCredits: resData.wallet.freeWeeklyCredits ?? prev.freeWeeklyCredits,
           totalSubmissions: prev.totalSubmissions + 1
-        }));
+        } : null));
       }
 
       if (resData.submission) {
-        setSubmissions(prev => [resData.submission, ...prev]);
+        setSubmissions(prev => {
+          const exists = prev.some(s => s.id === resData.submission.id);
+          if (exists) return prev;
+          return [resData.submission, ...prev];
+        });
       }
 
       // Trigger celebration confetti
@@ -610,6 +849,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     priceUsd: number,
     paymentMethod = 'card'
   ): Promise<boolean> => {
+    if (!currentUser) {
+      openLoginModal();
+      return false;
+    }
     try {
       const response = await fetch('/api/payments/instant-topup', {
         method: 'POST',
@@ -623,10 +866,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (response.ok) {
         const data = await response.json();
-        setCurrentUser(prev => ({
+        setCurrentUser(prev => (prev ? {
           ...prev,
           creditBalance: data.newBalance
-        }));
+        } : null));
 
         if (data.transaction) {
           setTransactions(prev => [data.transaction, ...prev]);
@@ -653,8 +896,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Connect Spotify OAuth (Popup Flow adhering to OAuth Skill)
   const connectSpotifyOAuth = async () => {
+    const targetUserId = currentUser?.id || 'usr_sanelow_1';
     try {
-      const res = await fetch(`/api/auth/spotify/url?userId=${currentUser.id}`);
+      const res = await fetch(`/api/auth/spotify/url?userId=${targetUserId}`);
       const data = await res.json();
 
       if (data.url) {
@@ -676,17 +920,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             window.removeEventListener('message', handleMessage);
 
             if (event.data.user) {
-              setCurrentUser(prev => ({
+              setCurrentUser(prev => (prev ? {
                 ...prev,
                 ...event.data.user,
                 verifiedStatus: true
-              }));
+              } : null));
             } else {
-              setCurrentUser(prev => ({
+              setCurrentUser(prev => (prev ? {
                 ...prev,
                 spotifyId: 'spotify_verified_user',
                 verifiedStatus: true
-              }));
+              } : null));
             }
 
             try {
@@ -711,7 +955,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
+          userId: currentUser?.id || 'usr_guest',
           playlistId,
           actionType
         })
@@ -724,6 +968,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Add curator playlist
   const addPlaylist = async (playlistData: Omit<Playlist, 'id' | 'curatorId' | 'curatorName' | 'curatorAvatar' | 'curatorSpotifyId' | 'approvalRate' | 'avgResponseHours' | 'isVerified'>) => {
+    if (!currentUser) {
+      openLoginModal();
+      return null;
+    }
     try {
       const response = await fetch('/api/playlists', {
         method: 'POST',
@@ -740,7 +988,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (response.ok) {
         const data = await response.json();
         if (data.playlist) {
-          setPlaylists(prev => [data.playlist, ...prev]);
+          setPlaylists(prev => {
+            const exists = prev.some(p => p.id === data.playlist.id);
+            if (exists) return prev;
+            return [data.playlist, ...prev];
+          });
           return data.playlist;
         }
       }
@@ -769,15 +1021,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Audio Controls
-  const playTrack = (track: Track, playlistContext?: string) => {
-    setAudioState({
+  // Audio Controls & Spotify Playback Engine
+  const playTrack = useCallback((track: Track, playlistContext?: string) => {
+    const parsed = parseSpotifyUrl(track.spotifyUrl || track.spotifyUri);
+    const spotifyId = parsed?.id || (track.id.startsWith('spot_') ? track.id.replace('spot_', '') : undefined);
+    const spotifyType = parsed?.type || 'track';
+    const embedUrl = parsed?.embedUrl || (spotifyId ? `https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator&theme=0` : undefined);
+
+    setAudioState(prev => ({
+      ...prev,
       currentTrack: track,
       isPlaying: true,
       currentTime: 0,
-      duration: 30,
-      playlistContext
-    });
+      duration: track.durationSec || 180,
+      playlistContext: playlistContext || prev.playlistContext,
+      activeSpotifyId: spotifyId,
+      activeSpotifyType: spotifyType,
+      embedUrl
+    }));
 
     globalAudioEngine.playTrack(
       track,
@@ -785,7 +1046,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setAudioState(prev => ({
           ...prev,
           currentTime: current,
-          duration: duration || 30
+          duration: duration || track.durationSec || 180
         }));
       },
       () => {
@@ -796,23 +1057,131 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }));
       }
     );
-  };
+  }, []);
 
-  const pauseTrack = () => {
+  const pauseTrack = useCallback(() => {
     globalAudioEngine.stop();
     setAudioState(prev => ({ ...prev, isPlaying: false }));
-  };
+  }, []);
 
-  const stopAudio = () => {
+  const resumeTrack = useCallback(() => {
+    if (audioState.currentTrack) {
+      playTrack(audioState.currentTrack, audioState.playlistContext);
+    }
+  }, [audioState.currentTrack, audioState.playlistContext, playTrack]);
+
+  const stopAudio = useCallback(() => {
     globalAudioEngine.stop();
-    setAudioState({
-      currentTrack: null,
+    setAudioState(prev => ({
+      ...prev,
       isPlaying: false,
-      currentTime: 0,
-      duration: 30,
-      playlistContext: undefined
+      currentTime: 0
+    }));
+  }, []);
+
+  const seekAudio = useCallback((seconds: number) => {
+    globalAudioEngine.seek(seconds);
+    setAudioState(prev => ({ ...prev, currentTime: seconds }));
+  }, []);
+
+  const setVolume = useCallback((vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    globalAudioEngine.setVolume(clamped);
+    setAudioState(prev => ({ ...prev, volume: clamped, isMuted: clamped === 0 }));
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    setAudioState(prev => {
+      const willMute = !prev.isMuted;
+      globalAudioEngine.setVolume(willMute ? 0 : (prev.volume ?? 0.8));
+      return { ...prev, isMuted: willMute };
     });
-  };
+  }, []);
+
+  const toggleEmbedExpanded = useCallback(() => {
+    setAudioState(prev => ({ ...prev, isEmbedExpanded: !prev.isEmbedExpanded }));
+  }, []);
+
+  // Play Spotify URL or URI directly with automatic metadata parsing
+  const playSpotifyUrl = useCallback(async (urlOrUri: string, contextTitle?: string): Promise<boolean> => {
+    try {
+      showToast('Parsing Spotify Link...', 'Retrieving high-res cover art & metadata...', 'info', 2000);
+      const meta = await fetchSpotifyMetadata(urlOrUri);
+      if (!meta) {
+        showToast('Invalid Spotify URL', 'Could not detect a valid Spotify track, album, or playlist link.', 'error');
+        return false;
+      }
+
+      const track = convertSpotifyMetadataToTrack(meta);
+      playTrack(track, contextTitle || (meta.type === 'playlist' ? `Playlist: ${meta.title}` : `Spotify ${meta.type.toUpperCase()}`));
+
+      setAudioState(prev => ({
+        ...prev,
+        activeSpotifyId: meta.id,
+        activeSpotifyType: meta.type,
+        embedUrl: meta.embedUrl,
+        parsedMetadata: meta
+      }));
+
+      showToast(
+        'Now Playing on Spotify',
+        `"${meta.title}" by ${meta.artist} loaded into sticky footer player`,
+        'success'
+      );
+      return true;
+    } catch (err: any) {
+      showToast('Playback Error', err.message || 'Failed to parse Spotify link', 'error');
+      return false;
+    }
+  }, [playTrack, showToast]);
+
+  // Queue cycling: Next & Previous
+  const getAllAvailableTracks = useCallback((): Track[] => {
+    const tracks: Track[] = [];
+    const seen = new Set<string>();
+
+    // From user tracks
+    artistTracks.forEach(t => {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        tracks.push(t);
+      }
+    });
+
+    // From playlists
+    playlists.forEach(p => {
+      if (p.spotlightTrack && !seen.has(p.spotlightTrack.id)) {
+        seen.add(p.spotlightTrack.id);
+        tracks.push(p.spotlightTrack);
+      }
+      p.recentAddedTracks?.forEach(t => {
+        if (!seen.has(t.id)) {
+          seen.add(t.id);
+          tracks.push(t);
+        }
+      });
+    });
+
+    return tracks;
+  }, [artistTracks, playlists]);
+
+  const playNextTrack = useCallback(() => {
+    const all = getAllAvailableTracks();
+    if (all.length === 0) return;
+    const currentId = audioState.currentTrack?.id;
+    const currentIndex = all.findIndex(t => t.id === currentId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % all.length;
+    playTrack(all[nextIndex]);
+  }, [getAllAvailableTracks, audioState.currentTrack?.id, playTrack]);
+
+  const playPreviousTrack = useCallback(() => {
+    const all = getAllAvailableTracks();
+    if (all.length === 0) return;
+    const currentId = audioState.currentTrack?.id;
+    const currentIndex = all.findIndex(t => t.id === currentId);
+    const prevIndex = currentIndex === -1 ? 0 : (currentIndex - 1 + all.length) % all.length;
+    playTrack(all[prevIndex]);
+  }, [getAllAvailableTracks, audioState.currentTrack?.id, playTrack]);
 
   // Modals
   const openPitchModal = (playlist?: Playlist) => {
@@ -856,15 +1225,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const userPlaylists = playlists.filter(p => p.curatorId === currentUser.id);
-  const artistSubmissions = submissions.filter(s => s.artistId === currentUser.id);
-  const curatorInboxSubmissions = submissions.filter(s => s.curatorId === currentUser.id || s.curatorId === 'usr_curator_1');
-  const unreadNotificationCount = notifications.filter(n => !n.read && n.userId === currentUser.id).length;
+  const userPlaylists = playlists.filter(p => currentUser && p.curatorId === currentUser.id);
+  const artistSubmissions = submissions.filter(s => currentUser && s.artistId === currentUser.id);
+  const curatorInboxSubmissions = submissions.filter(s => currentUser && (s.curatorId === currentUser.id || s.curatorId === 'usr_curator_1'));
+  const unreadNotificationCount = currentUser ? notifications.filter(n => !n.read && n.userId === currentUser.id).length : 0;
 
   return (
     <AppContext.Provider
       value={{
         currentUser,
+        isAuthenticated,
+        login,
+        register,
+        logout,
+        authModalOpen,
+        setAuthModalOpen,
+        authModalMode,
+        setAuthModalMode,
+        openLoginModal,
+        openRegisterModal,
         activeRole,
         switchUserRole,
         updateUserProfile,
@@ -881,7 +1260,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         reviewSubmission,
         transactions,
         purchaseCredits,
-        freeWeeklyCredits: currentUser.freeWeeklyCredits || 0,
+        freeWeeklyCredits: currentUser?.freeWeeklyCredits || 0,
         curatorActivities,
         emailLogs,
         verifyGateAction,
@@ -896,7 +1275,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         audioState,
         playTrack,
         pauseTrack,
+        resumeTrack,
         stopAudio,
+        seekAudio,
+        setVolume,
+        toggleMute,
+        toggleEmbedExpanded,
+        playSpotifyUrl,
+        playNextTrack,
+        playPreviousTrack,
         pitchModalOpen,
         selectedPlaylistForPitch,
         openPitchModal,
@@ -909,7 +1296,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addArtistTrack,
         liveActiveCuratorsCount,
         recentLivePlacement,
-        isWsConnected
+        isWsConnected,
+        toasts,
+        showToast,
+        removeToast
       }}
     >
       {children}

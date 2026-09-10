@@ -24,7 +24,9 @@ export const MarketplaceView: React.FC = () => {
     openPitchModal,
     audioState,
     playTrack,
-    pauseTrack
+    pauseTrack,
+    switchUserRole,
+    setOnboardPlaylistModalOpen
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -283,8 +285,8 @@ export const MarketplaceView: React.FC = () => {
                   <div className="pt-2">
                     <button
                       onClick={() => {
-                        useApp().switchUserRole('curator');
-                        useApp().setOnboardPlaylistModalOpen(true);
+                        switchUserRole('curator');
+                        setOnboardPlaylistModalOpen(true);
                       }}
                       className="btn-sane text-xs px-6 py-3 rounded-xl font-bold inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
                     >

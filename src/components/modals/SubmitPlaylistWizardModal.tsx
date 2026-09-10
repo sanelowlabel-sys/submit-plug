@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   X,
   ListMusic,
@@ -19,7 +20,8 @@ import {
   Sliders,
   DollarSign,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  LogIn
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -37,7 +39,9 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
     setOnboardPlaylistModalOpen,
     addPlaylist,
     currentUser,
-    setActiveTab
+    setActiveTab,
+    openLoginModal,
+    openRegisterModal
   } = useApp();
 
   const showModal = isOpen !== undefined ? isOpen : onboardPlaylistModalOpen;
@@ -164,8 +168,8 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
           requirePlaylistFollow,
           requireSongSave,
           curatorSpotifyProfileUrl:
-            currentUser.spotifyUri ||
-            `https://open.spotify.com/user/${currentUser.spotifyId || 'curator'}`,
+            currentUser?.spotifyUri ||
+            `https://open.spotify.com/user/${currentUser?.spotifyId || 'curator'}`,
           targetSongSpotifyUrl: targetSongUrl
         }
       });
@@ -194,12 +198,10 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
       <div className="card-sane w-full max-w-2xl rounded-2xl border border-[#3a3a3a] shadow-2xl overflow-hidden my-6 bg-[#161616]">
-        {/* Wizard Header Bar */}
+        {/* Wizard Header Bar with Brand Logo */}
         <div className="px-6 py-5 border-b border-[#2e2e2e] flex items-center justify-between bg-[#1f1f1f]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#BE1E2F] flex items-center justify-center text-white shadow-md shadow-[#BE1E2F]/25">
-              <ListMusic className="w-5 h-5" />
-            </div>
+            <BrandLogo size={36} withBadge={false} alt="Brand Logo" />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-title font-bold text-white tracking-wide">
@@ -218,12 +220,51 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
           <button
             onClick={handleClose}
             className="w-8 h-8 rounded-lg bg-[#2b2b2b] border border-[#3a3a3a] text-white/60 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Wizard Step Progress Indicator */}
+        {/* Unauthenticated Curator Gate */}
+        {!currentUser ? (
+          <div className="p-8 text-center space-y-5">
+            <div className="flex justify-center">
+              <BrandLogo size={60} alt="Brand Logo" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-lg font-title font-bold text-white tracking-wide">
+                AUTHENTICATION REQUIRED TO ONBOARD PLAYLISTS
+              </h4>
+              <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto">
+                Please sign in or create a verified curator account to connect your Spotify playlists and receive real-time track pitches.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  handleClose();
+                  openLoginModal();
+                }}
+                className="w-full sm:w-auto btn-sane px-6 py-2.5 rounded-xl font-title font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+              >
+                <LogIn className="w-4 h-4" />
+                SIGN IN NOW
+              </button>
+              <button
+                onClick={() => {
+                  handleClose();
+                  openRegisterModal();
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-title font-bold text-xs bg-[#242424] text-white border border-[#3a3a3a] hover:border-[#BE1E2F] transition-colors cursor-pointer"
+              >
+                CREATE CURATOR ACCOUNT
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Wizard Step Progress Indicator */}
         <div className="px-6 py-3 bg-[#181818] border-b border-[#2a2a2a] grid grid-cols-4 gap-2">
           {[
             { step: 1, label: '1. Playlist Info' },
@@ -778,6 +819,8 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

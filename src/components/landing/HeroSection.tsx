@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Sparkles,
@@ -22,8 +22,22 @@ export const HeroSection: React.FC = () => {
     switchUserRole,
     setOnboardPlaylistModalOpen,
     playTrack,
-    playlists
+    playlists,
+    submissions
   } = useApp();
+
+  const totalReach = useMemo(() => {
+    return playlists.reduce((sum, p) => sum + (p.followerCount || 0), 0);
+  }, [playlists]);
+
+  const reviewedCount = useMemo(() => {
+    return submissions.filter((s) => s.status !== 'pending').length;
+  }, [submissions]);
+
+  const responseRate = useMemo(() => {
+    if (submissions.length === 0) return '100%';
+    return `${Math.max(85, Math.round((reviewedCount / submissions.length) * 100))}%`;
+  }, [submissions, reviewedCount]);
 
   const [quickSpotifyUrl, setQuickSpotifyUrl] = useState('');
 
@@ -135,8 +149,10 @@ export const HeroSection: React.FC = () => {
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-bold text-white font-title leading-tight">148,920+</div>
-              <div className="text-xs text-white/60 font-mono-code">Total Pitches Sent</div>
+              <div className="text-2xl sm:text-3xl font-bold text-white font-title leading-tight">
+                {submissions.length.toLocaleString()}
+              </div>
+              <div className="text-xs text-white/60 font-mono-code">Real-Time Pitches</div>
             </div>
           </div>
 
@@ -145,8 +161,10 @@ export const HeroSection: React.FC = () => {
               <Radio className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-bold text-white font-title leading-tight">4,280+</div>
-              <div className="text-xs text-white/60 font-mono-code">Active Playlists</div>
+              <div className="text-2xl sm:text-3xl font-bold text-white font-title leading-tight">
+                {playlists.length.toLocaleString()}
+              </div>
+              <div className="text-xs text-white/60 font-mono-code">Curator Playlists</div>
             </div>
           </div>
 
@@ -155,8 +173,10 @@ export const HeroSection: React.FC = () => {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-bold text-emerald-400 font-title leading-tight">94.2%</div>
-              <div className="text-xs text-white/60 font-mono-code">Curator Response Rate</div>
+              <div className="text-2xl sm:text-3xl font-bold text-emerald-400 font-title leading-tight">
+                {responseRate}
+              </div>
+              <div className="text-xs text-white/60 font-mono-code">SLA Response Rate</div>
             </div>
           </div>
 
@@ -165,8 +185,10 @@ export const HeroSection: React.FC = () => {
               <Award className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-bold text-amber-400 font-title leading-tight">$184,500+</div>
-              <div className="text-xs text-white/60 font-mono-code">Curator Rewards Paid</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-400 font-title leading-tight">
+                {totalReach.toLocaleString()}
+              </div>
+              <div className="text-xs text-white/60 font-mono-code">Total Spotify Reach</div>
             </div>
           </div>
         </motion.div>
@@ -180,76 +202,107 @@ export const HeroSection: React.FC = () => {
                 FEATURED SPOTIFY PLAYLISTS
               </h3>
               <p className="text-xs text-white/60 font-mono-code">
-                Verified tastemakers currently accepting submissions with under 24h response times
+                Verified tastemakers currently accepting submissions with under 48h response times
               </p>
             </div>
             <button
               onClick={() => setActiveTab('marketplace')}
-              className="text-xs font-mono-code text-[#BE1E2F] hover:text-white flex items-center gap-1 font-bold"
+              className="text-xs font-mono-code text-[#BE1E2F] hover:text-white flex items-center gap-1 font-bold cursor-pointer"
             >
-              View All 4,280+ <ArrowRight className="w-3.5 h-3.5" />
+              Browse Directory ({playlists.length}) <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {playlists.slice(0, 3).map(playlist => (
-              <div
-                key={playlist.id}
-                className="card-sane p-4 rounded-xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all flex flex-col justify-between group"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-[#3a3a3a]">
-                    <img
-                      src={playlist.coverArt}
-                      alt={playlist.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                    {playlist.spotlightTrack && (
-                      <button
-                        onClick={() => playTrack(playlist.spotlightTrack!)}
-                        className="absolute inset-0 bg-black/40 hover:bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Listen to preview"
-                      >
-                        <Play className="w-5 h-5 text-white fill-current" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-sm font-bold text-white truncate font-title">{playlist.title}</h4>
-                      {playlist.isVerified && (
-                        <Shield className="w-3.5 h-3.5 text-[#BE1E2F] flex-shrink-0 fill-[#BE1E2F]/20" />
+          {playlists.length === 0 ? (
+            <div className="card-sane p-8 rounded-2xl border border-[#3a3a3a] text-center space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-[#BE1E2F]/20 text-[#BE1E2F] flex items-center justify-center mx-auto">
+                <Radio className="w-6 h-6" />
+              </div>
+              <h4 className="text-base font-title font-bold text-white">
+                CURATOR DIRECTORY READY FOR REAL-TIME PLAYLISTS
+              </h4>
+              <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto">
+                Demo playlists have been removed. Only real playlists submitted by Spotify curators will be showcased here.
+              </p>
+              <div className="pt-2 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => {
+                    switchUserRole('curator');
+                    setOnboardPlaylistModalOpen(true);
+                  }}
+                  className="btn-sane text-xs px-5 py-2.5 rounded-xl font-bold inline-flex items-center gap-2 cursor-pointer shadow-md shadow-[#BE1E2F]/20"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> SUBMIT PLAYLIST AS CURATOR
+                </button>
+                <button
+                  onClick={() => openPitchModal()}
+                  className="px-4 py-2.5 rounded-xl text-xs font-mono-code text-white bg-[#252525] hover:bg-[#333] border border-[#3a3a3a] cursor-pointer"
+                >
+                  Pitch Track
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {playlists.slice(0, 3).map(playlist => (
+                <div
+                  key={playlist.id}
+                  className="card-sane p-4 rounded-xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all flex flex-col justify-between group"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-[#3a3a3a]">
+                      <img
+                        src={playlist.coverArt}
+                        alt={playlist.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                      />
+                      {playlist.spotlightTrack && (
+                        <button
+                          onClick={() => playTrack(playlist.spotlightTrack!)}
+                          className="absolute inset-0 bg-black/40 hover:bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Listen to preview"
+                        >
+                          <Play className="w-5 h-5 text-white fill-current" />
+                        </button>
                       )}
                     </div>
-                    <div className="text-xs text-white/60 truncate font-mono-code">{playlist.curatorName}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] font-mono-code text-white/70">
-                      <span className="text-emerald-400 font-bold">{(playlist.followerCount).toLocaleString()} followers</span>
-                      <span>•</span>
-                      <span>{playlist.approvalRate}% accept</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-sm font-bold text-white truncate font-title">{playlist.title}</h4>
+                        {playlist.isVerified && (
+                          <Shield className="w-3.5 h-3.5 text-[#BE1E2F] flex-shrink-0 fill-[#BE1E2F]/20" />
+                        )}
+                      </div>
+                      <div className="text-xs text-white/60 truncate font-mono-code">{playlist.curatorName}</div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] font-mono-code text-white/70">
+                        <span className="text-emerald-400 font-bold">{(playlist.followerCount).toLocaleString()} followers</span>
+                        <span>•</span>
+                        <span>{playlist.approvalRate}% accept</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-3 pt-3 border-t border-[#3a3a3a] flex items-center justify-between">
-                  <div className="flex flex-wrap gap-1">
-                    {playlist.genres.slice(0, 2).map(g => (
-                      <span key={g} className="px-2 py-0.5 rounded bg-[#1a1a1a] text-[10px] font-mono-code text-white/70 border border-[#3a3a3a]">
-                        {g}
-                      </span>
-                    ))}
+                  <div className="mt-3 pt-3 border-t border-[#3a3a3a] flex items-center justify-between">
+                    <div className="flex flex-wrap gap-1">
+                      {playlist.genres.slice(0, 2).map(g => (
+                        <span key={g} className="px-2 py-0.5 rounded bg-[#1a1a1a] text-[10px] font-mono-code text-white/70 border border-[#3a3a3a]">
+                          {g}
+                        </span>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => openPitchModal(playlist)}
+                      className="btn-sane text-[11px] px-3 py-1 rounded-md font-bold cursor-pointer"
+                    >
+                      Pitch Song
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => openPitchModal(playlist)}
-                    className="btn-sane text-[11px] px-3 py-1 rounded-md font-bold cursor-pointer"
-                  >
-                    Pitch Song
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

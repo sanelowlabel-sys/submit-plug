@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Track } from '../../types';
+import { DashboardAnalyticsCharts } from '../common/DashboardAnalyticsCharts';
 import {
   Music2,
   Sparkles,
@@ -720,52 +721,7 @@ export const ArtistDashboard: React.FC = () => {
       {/* TAB 4: Streaming Impact & Stats */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-          <div className="card-panel p-6 rounded-2xl border border-[#3a3a3a] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-mono-code text-[#BE1E2F] font-bold">ORGANIC DISCOVERY ESTIMATOR</span>
-                <h3 className="text-xl font-title text-white mt-1">
-                  ESTIMATED STREAMING BOOST FROM SUBMIT PLUG
-                </h3>
-                <p className="text-xs text-white/60 font-mono-code mt-0.5">
-                  Tracked over active placements on verified Spotify playlists.
-                </p>
-              </div>
-
-              <div className="text-left sm:text-right">
-                <div className="text-3xl font-bold font-title text-emerald-400">
-                  +{(totalPlaced * 14500 + 3200).toLocaleString()} Streams
-                </div>
-                <div className="text-[10px] text-white/50 font-mono-code">
-                  Generated this month across all playlists
-                </div>
-              </div>
-            </div>
-
-            {/* Visual Stream Graph Simulator */}
-            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#3a3a3a] space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono-code text-white/60">
-                <span>30-Day Stream Growth Trajectory</span>
-                <span className="text-emerald-400 font-bold">▲ +48.2% vs Previous Period</span>
-              </div>
-
-              <div className="flex items-end gap-2 h-28 pt-4">
-                {[35, 42, 38, 55, 60, 52, 68, 75, 70, 84, 92, 100].map((val, idx) => (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
-                    <div
-                      className="w-full bg-[#BE1E2F]/80 group-hover:bg-[#BE1E2F] rounded-t transition-all duration-300 relative"
-                      style={{ height: `${val}%` }}
-                    >
-                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-[#2b2b2b] text-[10px] font-mono-code text-white px-1.5 py-0.5 rounded border border-[#3a3a3a] pointer-events-none whitespace-nowrap">
-                        +{val * 120}
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-mono-code text-white/40">W{idx + 1}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <DashboardAnalyticsCharts role="artist" />
         </div>
       )}
 

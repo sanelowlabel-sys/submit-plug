@@ -10,14 +10,14 @@ export const HowItWorks: React.FC = () => {
     {
       num: '01',
       title: 'SELECT PLAYLISTS',
-      desc: 'Browse 4,000+ genre-specific Spotify playlists filtered by follower count, approval rate, and curator response speed.',
+      desc: 'Browse real-time, genre-specific Spotify playlists uploaded by verified curators and filtered by followers and SLA response times.',
       icon: <Radio className="w-6 h-6 text-[#BE1E2F]" />,
-      badge: 'Marketplace Discovery'
+      badge: 'Real-Time Discovery'
     },
     {
       num: '02',
       title: 'CHOOSE PITCH TYPE',
-      desc: 'Submit for FREE by listening to 30 seconds of the curator\'s spotlight track, or use 1-2 credits for Guaranteed 48-Hour Review.',
+      desc: 'Submit for FREE via curator social gates, or use curator-selected credits (1-10 CR) for Guaranteed 48-Hour Review and detailed feedback.',
       icon: <Sparkles className="w-6 h-6 text-[#BE1E2F]" />,
       badge: 'Free or Premium'
     },

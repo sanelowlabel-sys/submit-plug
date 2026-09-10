@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   User,
   ShieldCheck,
@@ -14,7 +15,8 @@ import {
   Radio,
   Mail,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  LogIn
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
@@ -29,15 +31,59 @@ export const ProfileView: React.FC = () => {
     setActiveTab,
     emailLogs,
     connectSpotifyOAuth,
-    freeWeeklyCredits
+    freeWeeklyCredits,
+    openLoginModal,
+    openRegisterModal
   } = useApp();
 
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
-  const [bio, setBio] = useState(currentUser.bio);
-  const [spotifyFollowers, setSpotifyFollowers] = useState(currentUser.spotifyFollowers || 45000);
+  const [name, setName] = useState(currentUser?.name || '');
+  const [email, setEmail] = useState(currentUser?.email || '');
+  const [bio, setBio] = useState(currentUser?.bio || '');
+  const [spotifyFollowers, setSpotifyFollowers] = useState(currentUser?.spotifyFollowers || 45000);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'details' | 'roles' | 'spotify' | 'emails' | 'security'>('details');
+
+  useEffect(() => {
+    if (currentUser) {
+      setName(currentUser.name || '');
+      setEmail(currentUser.email || '');
+      setBio(currentUser.bio || '');
+      setSpotifyFollowers(currentUser.spotifyFollowers || 45000);
+    }
+  }, [currentUser]);
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6 animate-fadeIn">
+        <div className="flex justify-center">
+          <BrandLogo size={68} alt="Brand Logo" />
+        </div>
+        <div className="card-sane p-8 rounded-2xl border border-[#3a3a3a] space-y-4 bg-[#141414]">
+          <h2 className="text-2xl font-bold font-title text-white tracking-wider">
+            AUTHENTICATION REQUIRED
+          </h2>
+          <p className="text-sm text-white/60 font-mono-code max-w-md mx-auto">
+            Please sign in to access your artist & curator profile, manage Spotify playlist verifications, and track real-time pitches.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
+            <button
+              onClick={() => openLoginModal()}
+              className="w-full sm:w-auto btn-sane px-6 py-2.5 rounded-xl font-title font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+            >
+              <LogIn className="w-4 h-4" />
+              SIGN IN
+            </button>
+            <button
+              onClick={() => openRegisterModal()}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-title font-bold text-xs bg-[#242424] text-white border border-[#3a3a3a] hover:border-[#BE1E2F] transition-colors cursor-pointer"
+            >
+              CREATE AN ACCOUNT
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +103,7 @@ export const ProfileView: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Profile Header Banner */}
+      {/* Profile Header Banner with Brand Logo */}
       <div className="card-sane p-6 sm:p-8 rounded-2xl border border-[#3a3a3a] relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
           <div className="relative">
@@ -85,11 +131,17 @@ export const ProfileView: React.FC = () => {
             <p className="text-xs text-white/70 font-mono-code mt-1 italic">"{currentUser.bio}"</p>
 
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-2 text-xs font-mono-code text-white/50">
+              <div className="flex items-center gap-1.5">
+                <BrandLogo size={20} withBadge={false} alt="Brand Logo" />
+                <span>Verified Account</span>
+              </div>
+              <span>•</span>
               <span>Member since {new Date(currentUser.createdAt).toLocaleDateString()}</span>
               <span>•</span>
-              <span className="text-emerald-400 font-bold">● Real-Time Sync Active</span>
-              <span>•</span>
-              <span className="text-white/70">Verified Account</span>
+              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                Real-Time Sync Active
+              </span>
             </div>
           </div>
         </div>

@@ -22,8 +22,10 @@ import {
   Sliders,
   AlertCircle,
   UserPlus,
-  Heart
+  Heart,
+  BarChart3
 } from 'lucide-react';
+import { DashboardAnalyticsCharts } from '../common/DashboardAnalyticsCharts';
 
 export const CuratorDashboard: React.FC = () => {
   const {
@@ -39,7 +41,7 @@ export const CuratorDashboard: React.FC = () => {
     curatorActivities
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'inbox' | 'playlists' | 'growth' | 'verification'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'playlists' | 'growth' | 'analytics' | 'verification'>('inbox');
   const [selectedSubForReview, setSelectedSubForReview] = useState<Submission | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'decline' | null>(null);
   const [feedbackTags, setFeedbackTags] = useState<string[]>([]);
@@ -256,6 +258,16 @@ export const CuratorDashboard: React.FC = () => {
           <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono-code font-bold">
             Live
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`pb-3 relative flex items-center gap-2 cursor-pointer ${
+            activeTab === 'analytics' ? 'text-white border-b-2 border-[#BE1E2F]' : 'text-white/50 hover:text-white'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-[#BE1E2F]" />
+          <span>ANALYTICS & CHARTS</span>
         </button>
 
         <button
@@ -599,6 +611,13 @@ export const CuratorDashboard: React.FC = () => {
               <div className="text-emerald-400 text-[10px] mt-0.5">✓ Zero bot activity detected</div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: Analytics & Charts */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          <DashboardAnalyticsCharts role="curator" />
         </div>
       )}
 

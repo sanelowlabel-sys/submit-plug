@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { BrandLogo } from '../common/BrandLogo';
 import { X, Coins, CheckCircle2, Zap, Lock, ShieldCheck, ExternalLink } from 'lucide-react';
 
 export interface BuyCreditPackage {
@@ -103,17 +104,15 @@ export const BuyCreditsModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="card-sane w-full max-w-xl rounded-2xl border border-[#3a3a3a] shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1a1a1a]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#0070BA] flex items-center justify-center text-white font-bold text-sm tracking-wider">
-              PP
-            </div>
+        {/* Header with Brand Logo */}
+        <div className="px-6 py-4 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1f1f1f]">
+          <div className="flex items-center gap-3">
+            <BrandLogo size={36} withBadge={false} alt="Brand Logo" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-title text-white">TOP UP SUBMISSION CREDITS</h3>
+                <h3 className="text-base font-title font-bold text-white tracking-wide">TOP UP SUBMISSION CREDITS</h3>
                 <span className="px-2 py-0.5 rounded bg-[#0070BA]/20 border border-[#0070BA]/40 text-[#0070BA] text-[9px] font-mono-code font-bold uppercase">
-                  PayPal Exclusive
+                  PayPal Protected
                 </span>
               </div>
               <div className="text-[11px] font-mono-code text-white/50">

@@ -17,6 +17,8 @@ import { PitchFlowModal } from './components/artist/PitchFlowModal';
 import { BuyCreditsModal } from './components/modals/BuyCreditsModal';
 import { OnboardPlaylistModal } from './components/modals/OnboardPlaylistModal';
 import { GlobalAudioPlayer } from './components/player/GlobalAudioPlayer';
+import { AuthModal } from './components/auth/AuthModal';
+import { ToastContainer } from './components/common/ToastContainer';
 
 const MainContent: React.FC = () => {
   const { activeTab, activeRole } = useApp();
@@ -53,11 +55,13 @@ const MainContent: React.FC = () => {
 
       <Footer />
 
-      {/* Global Modals & Player */}
+      {/* Global Modals & Player & Notifications */}
+      <AuthModal />
       <PitchFlowModal />
       <BuyCreditsModal />
       <OnboardPlaylistModal />
       <GlobalAudioPlayer />
+      <ToastContainer />
     </main>
   );
 };
