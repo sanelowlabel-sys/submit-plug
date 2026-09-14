@@ -171,7 +171,7 @@ export const Navbar: React.FC = () => {
                 className="btn-sane flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-title font-bold tracking-wider shadow-md shadow-[#BE1E2F]/20 cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>GET STARTED</span>
+                <span>SIGN UP</span>
               </button>
             </div>
           ) : (
@@ -380,6 +380,17 @@ export const Navbar: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Direct Logout Button */}
+              <button
+                id="nav-direct-logout-btn"
+                onClick={() => logout()}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono-code text-red-400 hover:text-red-300 hover:bg-red-950/25 border border-[#3a3a3a] hover:border-red-900/50 transition-colors cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="font-bold">Logout</span>
+              </button>
             </>
           )}
         </div>

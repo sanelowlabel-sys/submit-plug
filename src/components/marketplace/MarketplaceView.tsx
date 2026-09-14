@@ -25,6 +25,7 @@ export const MarketplaceView: React.FC = () => {
     audioState,
     playTrack,
     pauseTrack,
+    playSpotifyUrl,
     switchUserRole,
     setOnboardPlaylistModalOpen
   } = useApp();
@@ -339,29 +340,29 @@ export const MarketplaceView: React.FC = () => {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             referrerPolicy="no-referrer"
                           />
-                          {playlist.spotlightTrack && (
-                            <button
-                              onClick={() => {
-                                if (isPlayingThis) {
-                                  pauseTrack();
-                                } else {
-                                  playTrack(playlist.spotlightTrack!, playlist.title);
-                                }
-                              }}
-                              className={`absolute inset-0 flex items-center justify-center transition-all ${
-                                isPlayingThis
-                                  ? 'bg-[#BE1E2F]/80 text-white'
-                                  : 'bg-black/40 opacity-0 group-hover:opacity-100 text-white hover:bg-black/60'
-                              }`}
-                              title="Play spotlight preview"
-                            >
-                              {isPlayingThis ? (
-                                <Pause className="w-6 h-6 fill-current" />
-                              ) : (
-                                <Play className="w-6 h-6 fill-current ml-0.5" />
-                              )}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              if (isPlayingThis) {
+                                pauseTrack();
+                              } else if (playlist.spotlightTrack) {
+                                playTrack(playlist.spotlightTrack, playlist.title);
+                              } else {
+                                playSpotifyUrl(playlist.spotifyUrl, playlist.title);
+                              }
+                            }}
+                            className={`absolute inset-0 flex items-center justify-center transition-all ${
+                              isPlayingThis
+                                ? 'bg-[#BE1E2F]/80 text-white'
+                                : 'bg-black/40 opacity-0 group-hover:opacity-100 text-white hover:bg-black/60'
+                            }`}
+                            title={playlist.spotlightTrack ? 'Play spotlight preview' : 'Play playlist on Spotify player'}
+                          >
+                            {isPlayingThis ? (
+                              <Pause className="w-6 h-6 fill-current" />
+                            ) : (
+                              <Play className="w-6 h-6 fill-current ml-0.5" />
+                            )}
+                          </button>
                         </div>
 
                         <div className="min-w-0 flex-1">

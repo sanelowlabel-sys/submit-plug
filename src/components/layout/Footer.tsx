@@ -21,7 +21,7 @@ export const Footer: React.FC = () => {
   const { setActiveTab, switchUserRole, openPitchModal, setOnboardPlaylistModalOpen } = useApp();
 
   return (
-    <footer className="bg-[#0e0e0e] border-t border-[#262626] text-white/80 pt-16 pb-12 px-4 sm:px-6 lg:px-8 mt-24 relative overflow-hidden">
+    <footer className="bg-[#0e0e0e] border-t border-[#262626] text-white/80 pt-16 pb-28 sm:pb-32 px-4 sm:px-6 lg:px-8 mt-24 relative overflow-hidden">
       {/* Ambient background glow */}
       <div className="absolute bottom-0 left-1/4 w-[500px] h-[250px] bg-[#BE1E2F]/5 rounded-full blur-3xl pointer-events-none -z-10" />
 

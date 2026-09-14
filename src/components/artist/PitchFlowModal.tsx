@@ -20,9 +20,11 @@ import {
   UserPlus,
   Radio,
   Heart,
-  LogIn
+  LogIn,
+  Loader2
 } from 'lucide-react';
 import { globalAudioEngine } from '../../utils/audioEngine';
+import { fetchSpotifyMetadata, convertSpotifyMetadataToTrack } from '../../utils/spotifyParser';
 
 export const PitchFlowModal: React.FC = () => {
   const {
@@ -66,6 +68,7 @@ export const PitchFlowModal: React.FC = () => {
   // Custom Spotify URL input for new track
   const [customUrlInput, setCustomUrlInput] = useState('');
   const [showAddCustomTrack, setShowAddCustomTrack] = useState(false);
+  const [isImportingTrack, setIsImportingTrack] = useState(false);
 
   useEffect(() => {
     if (selectedPlaylistForPitch) {
@@ -148,32 +151,50 @@ export const PitchFlowModal: React.FC = () => {
     if (actionType === 'song_save') setGateSavedSong(true);
   };
 
-  const handleAddTrackFromSpotify = (e: React.FormEvent) => {
+  const handleAddTrackFromSpotify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customUrlInput.trim()) return;
 
-    const idMatch = customUrlInput.match(/track\/([a-zA-Z0-9]+)/);
-    const spotifyId = idMatch ? idMatch[1] : `trk_${Date.now()}`;
+    setIsImportingTrack(true);
+    setStatusMessage(null);
 
-    const newTrack: Track = {
-      id: `trk_${Date.now()}`,
-      title: customUrlInput.includes('track') ? 'Cosmic Frequency' : 'New Imported Master',
-      artist: currentUser.name,
-      albumArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
-      spotifyUrl: customUrlInput.startsWith('http') ? customUrlInput : `https://open.spotify.com/track/${spotifyId}`,
-      spotifyUri: `spotify:track:${spotifyId}`,
-      previewUrl: 'https://actions.google.com/sounds/v1/science_fiction/deep_pulse.ogg',
-      durationSec: 210,
-      genre: targetPlaylist.genres?.[0] || 'Electronic',
-      bpm: 125,
-      key: 'D Minor',
-      releaseDate: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const meta = await fetchSpotifyMetadata(customUrlInput.trim());
+      let newTrack: Track;
+      if (meta) {
+        newTrack = convertSpotifyMetadataToTrack(meta);
+        if (targetPlaylist.genres?.[0]) {
+          newTrack.genre = targetPlaylist.genres[0];
+        }
+      } else {
+        const idMatch = customUrlInput.match(/track\/([a-zA-Z0-9]+)/);
+        const spotifyId = idMatch ? idMatch[1] : `trk_${Date.now()}`;
+        newTrack = {
+          id: `trk_${Date.now()}`,
+          title: 'Imported Spotify Track',
+          artist: currentUser?.name || 'Verified Artist',
+          albumArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
+          spotifyUrl: customUrlInput.startsWith('http') ? customUrlInput : `https://open.spotify.com/track/${spotifyId}`,
+          spotifyUri: `spotify:track:${spotifyId}`,
+          previewUrl: '',
+          durationSec: 210,
+          genre: targetPlaylist.genres?.[0] || 'Electronic',
+          bpm: 125,
+          key: 'D Minor',
+          releaseDate: new Date().toISOString().split('T')[0]
+        };
+      }
 
-    addArtistTrack(newTrack);
-    setSelectedTrack(newTrack);
-    setShowAddCustomTrack(false);
-    setCustomUrlInput('');
+      addArtistTrack(newTrack);
+      setSelectedTrack(newTrack);
+      playTrack(newTrack, `Imported: ${newTrack.title}`);
+      setShowAddCustomTrack(false);
+      setCustomUrlInput('');
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to parse Spotify track.' });
+    } finally {
+      setIsImportingTrack(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -366,8 +387,19 @@ export const PitchFlowModal: React.FC = () => {
                         placeholder="https://open.spotify.com/track/..."
                         className="flex-1 bg-[#2b2b2b] text-white px-3 py-2 rounded-lg border border-[#3a3a3a] text-xs font-mono-code focus:outline-none focus:border-[#BE1E2F]"
                       />
-                      <button type="submit" className="btn-sane text-xs px-4 py-2 rounded-lg font-bold cursor-pointer">
-                        Import
+                      <button
+                        type="submit"
+                        disabled={isImportingTrack || !customUrlInput.trim()}
+                        className="btn-sane text-xs px-4 py-2 rounded-lg font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isImportingTrack ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Parsing...</span>
+                          </>
+                        ) : (
+                          <span>Import Track</span>
+                        )}
                       </button>
                     </div>
                   </form>

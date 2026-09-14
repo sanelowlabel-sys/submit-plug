@@ -24,6 +24,7 @@ import {
   LogIn
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { fetchSpotifyMetadata } from '../../utils/spotifyParser';
 
 interface SubmitPlaylistWizardModalProps {
   isOpen?: boolean;
@@ -122,18 +123,28 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
 
   const handleUrlChange = async (val: string) => {
     setSpotifyUrl(val);
-    if (val.includes('spotify.com/playlist/') || val.startsWith('spotify:playlist:')) {
+    if (
+      val.includes('spotify.com/playlist/') ||
+      val.startsWith('spotify:playlist:') ||
+      val.includes('open.spotify.com')
+    ) {
       setIsLookingUp(true);
       try {
-        const res = await fetch('/api/playlists/spotify-lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: val })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.title) setTitle(data.title);
-          if (data.thumbnailUrl) setCoverArt(data.thumbnailUrl);
+        const meta = await fetchSpotifyMetadata(val);
+        if (meta) {
+          if (meta.title) setTitle(meta.title);
+          if (meta.coverArt) setCoverArt(meta.coverArt);
+        } else {
+          const res = await fetch('/api/playlists/spotify-lookup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: val })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.title) setTitle(data.title);
+            if (data.thumbnailUrl) setCoverArt(data.thumbnailUrl);
+          }
         }
       } catch (err) {
         console.warn('Spotify lookup failed:', err);
