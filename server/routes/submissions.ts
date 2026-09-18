@@ -206,7 +206,7 @@ submissionsRouter.post('/:id/review', async (req: Request, res: Response) => {
   // Send automated HTML email to artist
   try {
     const artistUser = db.getUserById(submission.artistId);
-    const artistEmail = artistUser?.email || 'artist@submitplug.com';
+    const artistEmail = artistUser?.email || 'artist@playlistplug.com';
     const emailHtml = generateArtistDecisionEmailHtml(
       updated,
       action,

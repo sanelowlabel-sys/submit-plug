@@ -90,7 +90,7 @@ spotifyRouter.get('/metadata', async (req: Request, res: Response) => {
     try {
       const oEmbedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(canonicalUrl)}`;
       const oEmbedRes = await fetch(oEmbedUrl, {
-        headers: { 'User-Agent': 'SubmitPlug/1.0' }
+        headers: { 'User-Agent': 'PlaylistPlug/1.0' }
       });
       if (oEmbedRes.ok) {
         oEmbedData = await oEmbedRes.json();

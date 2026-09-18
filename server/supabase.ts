@@ -26,7 +26,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 export const SUPABASE_SQL_SCHEMA = `
--- Submit Plug: Supabase PostgreSQL Database Schema
+-- Playlist Plug: Supabase PostgreSQL Database Schema
 -- Project: https://nnrcrrgtndknswjwrlzp.supabase.co
 
 CREATE TABLE IF NOT EXISTS users (

@@ -71,7 +71,7 @@ paymentsRouter.post('/paypal/create-order', async (req: Request, res: Response) 
           purchase_units: [
             {
               reference_id: pkg.id,
-              description: `Submit Plug: ${pkg.credits} Submission Credits (${pkg.title})`,
+              description: `Playlist Plug: ${pkg.credits} Submission Credits (${pkg.title})`,
               custom_id: user.id,
               amount: {
                 currency_code: 'USD',
@@ -80,7 +80,7 @@ paymentsRouter.post('/paypal/create-order', async (req: Request, res: Response) 
             }
           ],
           application_context: {
-            brand_name: 'Submit Plug',
+            brand_name: 'Playlist Plug',
             landing_page: 'NO_PREFERENCE',
             user_action: 'PAY_NOW',
             return_url: `${origin}/?paypal=success&credits=${pkg.credits}&pkg=${pkg.id}`,

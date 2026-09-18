@@ -3,41 +3,41 @@ import React from 'react';
 interface BrandLogoProps {
   className?: string;
   size?: number;
+  width?: number | string;
+  height?: number | string;
   withBadge?: boolean;
   alt?: string;
+  variant?: 'badge' | 'icon';
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   className = '',
-  size = 40,
-  withBadge = true,
-  alt = 'Brand Logo'
+  size,
+  width,
+  height,
+  withBadge,
+  alt = 'Playlist Plug',
+  variant = 'badge'
 }) => {
+  const computedHeight = height || size || 38;
+  const isSquare = variant === 'icon';
+
   return (
     <div
-      className={`relative flex items-center justify-center flex-shrink-0 select-none group transition-transform duration-200 hover:scale-105 ${className}`}
-      style={{ width: size, height: size }}
-      title="Submit Plug"
+      className={`relative inline-flex items-center justify-center flex-shrink-0 select-none group transition-transform duration-200 hover:scale-[1.03] ${className}`}
+      title="Playlist Plug"
+      style={{
+        height: typeof computedHeight === 'number' ? `${computedHeight}px` : computedHeight,
+        width: isSquare
+          ? (typeof computedHeight === 'number' ? `${computedHeight}px` : computedHeight)
+          : (width ? (typeof width === 'number' ? `${width}px` : width) : 'auto')
+      }}
     >
-      {withBadge ? (
-        <div className="w-full h-full rounded-xl bg-[#191919] border border-[#333333] p-1.5 flex items-center justify-center shadow-md shadow-black/40 aspect-square">
-          <img
-            src="/logo.svg"
-            alt={alt}
-            width={size}
-            height={size}
-            className="w-full h-full object-contain aspect-square filter drop-shadow-[0_2px_8px_rgba(190,30,47,0.3)]"
-          />
-        </div>
-      ) : (
-        <img
-          src="/logo.svg"
-          alt={alt}
-          width={size}
-          height={size}
-          className="w-full h-full object-contain aspect-square filter drop-shadow-[0_2px_8px_rgba(190,30,47,0.3)]"
-        />
-      )}
+      <img
+        src={isSquare ? '/favicon.svg' : '/logo.svg'}
+        alt={alt}
+        className="h-full w-auto max-w-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,168,38,0.25)]"
+      />
     </div>
   );
 };

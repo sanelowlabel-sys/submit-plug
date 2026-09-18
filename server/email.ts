@@ -48,7 +48,7 @@ export async function sendEmailNotification(params: SendMailParams): Promise<Ema
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'Submit Plug <notifications@submitplug.com>',
+          from: process.env.EMAIL_FROM || 'Playlist Plug <notifications@playlistplug.com>',
           to,
           subject,
           html,
@@ -68,7 +68,7 @@ export async function sendEmailNotification(params: SendMailParams): Promise<Ema
     // 2. Try SMTP if configured
     try {
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || '"Submit Plug" <notifications@submitplug.com>',
+        from: process.env.EMAIL_FROM || '"Playlist Plug" <notifications@playlistplug.com>',
         to,
         subject,
         html,
@@ -100,7 +100,7 @@ export async function sendEmailNotification(params: SendMailParams): Promise<Ema
 export function generateCuratorSubmissionEmailHtml(submission: SubmissionRecord, playlist: PlaylistRecord): string {
   const pitchBadge = submission.pitchType === 'premium' ? '⚡ Premium Pitch (Guaranteed Review)' : '🌱 Free Weekly Pitch';
   const audioPreviewBtn = submission.track.previewUrl
-    ? `<a href="${submission.track.previewUrl}" target="_blank" style="display:inline-block;background:#BE1E2F;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;margin-right:12px;">▶ Listen Audio Preview</a>`
+    ? `<a href="${submission.track.previewUrl}" target="_blank" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;margin-right:12px;">▶ Listen Audio Preview</a>`
     : '';
 
   return `
@@ -111,18 +111,18 @@ export function generateCuratorSubmissionEmailHtml(submission: SubmissionRecord,
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
     .card { max-width: 600px; margin: 0 auto; background: #1a1a1a; border: 1px solid #333333; border-radius: 12px; overflow: hidden; }
-    .header { background: #141414; border-bottom: 2px solid #BE1E2F; padding: 24px; text-align: center; }
+    .header { background: #141414; border-bottom: 2px solid #1DB954; padding: 24px; text-align: center; }
     .content { padding: 24px; line-height: 1.6; }
     .track-box { display: flex; background: #222222; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #3a3a3a; }
-    .badge { display: inline-block; background: #BE1E2F; color: #ffffff; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
+    .badge { display: inline-block; background: #1DB954; color: #000000; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
     .footer { text-align: center; padding: 20px; font-size: 12px; color: #888888; border-top: 1px solid #282828; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
-      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">SUBMIT PLUG</h1>
-      <p style="margin:4px 0 0 0;color:#BE1E2F;font-size:13px;font-weight:bold;">NEW PLAYLIST SUBMISSION RECEIVED</p>
+      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">PLAYLIST PLUG</h1>
+      <p style="margin:4px 0 0 0;color:#1DB954;font-size:13px;font-weight:bold;">NEW PLAYLIST SUBMISSION RECEIVED</p>
     </div>
     <div class="content">
       <p>Hey <strong>${playlist.curatorName}</strong>,</p>
@@ -141,7 +141,7 @@ export function generateCuratorSubmissionEmailHtml(submission: SubmissionRecord,
       </div>
 
       ${submission.customMessage ? `
-        <div style="background:#181818;border-left:3px solid #BE1E2F;padding:12px 16px;margin:16px 0;font-style:italic;color:#cccccc;">
+        <div style="background:#181818;border-left:3px solid #1DB954;padding:12px 16px;margin:16px 0;font-style:italic;color:#cccccc;">
           "${submission.customMessage}"
         </div>
       ` : ''}
@@ -152,11 +152,11 @@ export function generateCuratorSubmissionEmailHtml(submission: SubmissionRecord,
       </div>
 
       <p style="margin-top: 28px; font-size: 13px; color: #aaaaaa;">
-        Please review this track inside your Submit Plug Curator Portal to complete review and award gate actions.
+        Please review this track inside your Playlist Plug Curator Portal to complete review and award gate actions.
       </p>
     </div>
     <div class="footer">
-      © ${new Date().getFullYear()} Submit Plug. Automated curator notification.
+      © ${new Date().getFullYear()} Playlist Plug. Automated curator notification.
     </div>
   </div>
 </body>
@@ -172,7 +172,7 @@ export function generateArtistDecisionEmailHtml(
   feedbackNote?: string
 ): string {
   const isApproved = action === 'approve';
-  const statusColor = isApproved ? '#1DB954' : '#BE1E2F';
+  const statusColor = isApproved ? '#1DB954' : '#71717a';
   const statusTitle = isApproved ? '🎉 TRACK APPROVED & PLACED!' : 'DECISION UPDATE: NOT A FIT THIS TIME';
 
   return `
@@ -194,7 +194,7 @@ export function generateArtistDecisionEmailHtml(
 <body>
   <div class="card">
     <div class="header">
-      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">SUBMIT PLUG</h1>
+      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">PLAYLIST PLUG</h1>
       <p style="margin:4px 0 0 0;color:${statusColor};font-size:14px;font-weight:bold;">${statusTitle}</p>
     </div>
     <div class="content">
@@ -237,11 +237,11 @@ export function generateArtistDecisionEmailHtml(
       ` : ''}
 
       <div style="margin-top:28px;text-align:center;">
-        <a href="/?tab=artist" style="display:inline-block;background:#BE1E2F;color:#ffffff;text-decoration:none;padding:10px 22px;border-radius:6px;font-weight:bold;">Open Campaign Tracker</a>
+        <a href="/?tab=artist" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:10px 22px;border-radius:6px;font-weight:bold;">Open Campaign Tracker</a>
       </div>
     </div>
     <div class="footer">
-      © ${new Date().getFullYear()} Submit Plug. Real-time playlist pitching network.
+      © ${new Date().getFullYear()} Playlist Plug. Real-time playlist pitching network.
     </div>
   </div>
 </body>

@@ -1,43 +1,52 @@
 import fs from 'fs';
 
-// Generate exact vector logo matching user's uploaded image
-const svg = `<svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g fill="#BE1E2F">
-    <!-- Top-left horizontal ear / wing -->
-    <rect x="75" y="155" width="145" height="66" rx="28" />
+// Exact vector badge matching user's uploaded 1.png image
+const svg = `<svg viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="rotate(-2.6 300 100)">
+    <!-- Main green tilted rectangle banner matching website brand color -->
+    <rect x="25" y="45" width="550" height="110" rx="4" fill="#1DB954" />
+    
+    <!-- Left white bullet dot -->
+    <circle cx="78" cy="100" r="12" fill="#FFFFFF" />
+    
+    <!-- Bold PLAYLISTPLUG lettering -->
+    <text 
+      x="300" 
+      y="114" 
+      font-family="'Plus Jakarta Sans', 'Montserrat', 'Arial Black', sans-serif" 
+      font-weight="900" 
+      font-size="46" 
+      fill="#FFFFFF" 
+      text-anchor="middle" 
+      letter-spacing="2"
+      style="text-transform: uppercase;"
+    >PLAYLISTPLUG</text>
+    
+    <!-- Right white bullet dot -->
+    <circle cx="522" cy="100" r="12" fill="#FFFFFF" />
+  </g>
+</svg>`;
 
-    <!-- Top horizontal main bar -->
-    <rect x="150" y="90" width="148" height="66" rx="28" />
-
-    <!-- Top-right upward stalk -->
-    <rect x="352" y="90" width="73" height="131" rx="28" />
-
-    <!-- Upper loop left wall -->
-    <rect x="150" y="90" width="73" height="131" rx="28" />
-
-    <!-- Center spine bar -->
-    <rect x="153" y="219" width="194" height="62" rx="24" />
-
-    <!-- Upper right shoulder connector block -->
-    <rect x="290" y="155" width="135" height="66" rx="28" />
-
-    <!-- Lower left shoulder connector block -->
-    <rect x="75" y="279" width="135" height="66" rx="28" />
-
-    <!-- Lower-left downward stalk -->
-    <rect x="75" y="279" width="73" height="131" rx="28" />
-
-    <!-- Bottom-right horizontal ear / wing -->
-    <rect x="280" y="279" width="145" height="66" rx="28" />
-
-    <!-- Bottom horizontal main bar -->
-    <rect x="202" y="344" width="148" height="66" rx="28" />
-
-    <!-- Lower loop right wall -->
-    <rect x="277" y="279" width="73" height="131" rx="28" />
+// Icon / Favicon version (square with the rotated green badge and PLUG mark)
+const faviconSvg = `<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" rx="44" fill="#121212" />
+  <g transform="rotate(-3 100 100)">
+    <rect x="15" y="60" width="170" height="80" rx="4" fill="#1DB954" />
+    <circle cx="36" cy="100" r="8" fill="#FFFFFF" />
+    <text 
+      x="100" 
+      y="108" 
+      font-family="'Plus Jakarta Sans', 'Montserrat', 'Arial Black', sans-serif" 
+      font-weight="900" 
+      font-size="21" 
+      fill="#FFFFFF" 
+      text-anchor="middle" 
+      letter-spacing="0.8"
+    >PLAYLISTPLUG</text>
+    <circle cx="164" cy="100" r="8" fill="#FFFFFF" />
   </g>
 </svg>`;
 
 fs.writeFileSync('public/logo.svg', svg);
-fs.writeFileSync('public/favicon.svg', svg);
-console.log('Successfully wrote public/logo.svg and public/favicon.svg');
+fs.writeFileSync('public/favicon.svg', faviconSvg);
+console.log('Successfully generated public/logo.svg and public/favicon.svg');

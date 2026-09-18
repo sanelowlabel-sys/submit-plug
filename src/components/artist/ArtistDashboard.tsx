@@ -32,6 +32,8 @@ export const ArtistDashboard: React.FC = () => {
     addArtistTrack,
     playlists,
     openPitchModal,
+    openLoginModal,
+    openRegisterModal,
     setBuyCreditsModalOpen,
     audioState,
     playTrack,
@@ -59,10 +61,12 @@ export const ArtistDashboard: React.FC = () => {
       (statusFilter === 'pending' && sub.status === 'pending') ||
       (statusFilter === 'declined' && sub.status === 'declined');
 
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      sub.track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.playlistTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.curatorName.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (sub.track?.title || '').toLowerCase().includes(q) ||
+      (sub.playlistTitle || '').toLowerCase().includes(q) ||
+      (sub.curatorName || '').toLowerCase().includes(q);
 
     return matchesStatus && matchesSearch;
   });
@@ -78,8 +82,11 @@ export const ArtistDashboard: React.FC = () => {
 
   // Smart matching score algorithm
   const recommendedPlaylists = playlists.map(pl => {
-    const artistGenre = artistTracks[0]?.genre || 'Deep House';
-    const genreMatch = pl.genres.some(g => g.toLowerCase().includes(artistGenre.toLowerCase()) || artistGenre.toLowerCase().includes(g.toLowerCase()));
+    const artistGenre = (artistTracks[0]?.genre || 'Deep House').toLowerCase();
+    const genreMatch = (pl.genres || []).some(g => {
+      const gLower = (g || '').toLowerCase();
+      return gLower.includes(artistGenre) || artistGenre.includes(gLower);
+    });
     const matchScore = genreMatch ? (pl.approvalRate > 15 ? 96 : 89) : 74;
     return { playlist: pl, matchScore };
   }).sort((a, b) => b.matchScore - a.matchScore).slice(0, 4);
@@ -107,43 +114,75 @@ export const ArtistDashboard: React.FC = () => {
     setNewTrackSpotifyUrl('');
   };
 
+  if (!currentUser) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20">
+        <div className="glass-panel p-8 sm:p-10 rounded-3xl border border-white/10 text-center space-y-6 bg-surface shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-spotify-green/10 border border-spotify-green/30 flex items-center justify-center mx-auto text-spotify-green">
+            <Music2 className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-white">Artist Hub & Campaigns</h2>
+            <p className="text-sm font-sans text-white/60 max-w-md mx-auto">
+              Sign in or create an account to manage your release catalog, pitch tracks to verified Spotify curators, and track placement decisions in real-time.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => openLoginModal()}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-spotify-green hover:bg-spotify-green-hover text-black font-display font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-spotify-green/20"
+            >
+              Sign In to Artist Hub
+            </button>
+            <button
+              onClick={() => openRegisterModal()}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-surface-hover hover:bg-white/10 border border-white/10 text-white font-display font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Create Free Artist Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Artist Profile Header Bar */}
-      <div className="card-sane p-6 sm:p-7 rounded-2xl border border-[#3a3a3a] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+      <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden bg-surface">
         <div className="flex items-center gap-4">
           <div className="relative">
             <img
               src={currentUser.avatarUrl}
               alt={currentUser.name}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-[#BE1E2F]"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-spotify-green shadow-lg"
               referrerPolicy="no-referrer"
             />
-            <span className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-[#BE1E2F] text-[9px] font-mono-code text-white rounded font-bold uppercase">
+            <span className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-spotify-green text-[9px] font-sans text-black rounded-full font-bold uppercase shadow-sm">
               ARTIST
             </span>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-title text-white">{currentUser.name}</h1>
+              <h1 className="text-xl sm:text-2xl font-display font-bold text-white">{currentUser.name}</h1>
               {currentUser.verifiedStatus && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono-code font-bold flex items-center gap-1 border border-emerald-500/30">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-1 border border-emerald-500/30">
                   <CheckCircle2 className="w-3 h-3" /> SPOTIFY VERIFIED
                 </span>
               )}
             </div>
-            <p className="text-xs text-white/60 font-mono-code mt-0.5 max-w-lg truncate">
+            <p className="text-xs text-white/60 font-sans mt-0.5 max-w-lg truncate">
               {currentUser.bio}
             </p>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-mono-code text-white/50 mt-2">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-sans text-white/50 mt-2">
               <span>Spotify: {(currentUser.spotifyFollowers || 45000).toLocaleString()} Monthly Listeners</span>
               <span>•</span>
               <a
                 href={currentUser.spotifyUri || 'https://open.spotify.com'}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[#BE1E2F] hover:underline flex items-center gap-1 font-bold"
+                className="text-spotify-green hover:underline flex items-center gap-1 font-bold"
               >
                 Artist Profile <ExternalLink className="w-3 h-3" />
               </a>
@@ -155,20 +194,20 @@ export const ArtistDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setBuyCreditsModalOpen(true)}
-            className="card-panel px-4 py-2.5 rounded-xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all flex items-center gap-2 cursor-pointer"
+            className="glass-panel px-4 py-2.5 rounded-2xl border border-white/10 hover:border-spotify-green transition-all flex items-center gap-2 cursor-pointer bg-surface"
           >
             <Coins className="w-4 h-4 text-amber-400" />
             <div className="text-left">
-              <div className="text-[10px] text-white/50 font-mono-code">WALLET BALANCE</div>
-              <div className="text-xs font-bold font-mono-code text-white">
-                {currentUser.creditBalance} Credits <span className="text-[#BE1E2F]">+Top Up</span>
+              <div className="text-[10px] text-white/50 font-sans">WALLET BALANCE</div>
+              <div className="text-xs font-bold font-sans text-white">
+                {currentUser.creditBalance} Credits <span className="text-spotify-green font-bold">+Top Up</span>
               </div>
             </div>
           </button>
 
           <button
             onClick={() => openPitchModal()}
-            className="btn-sane text-xs px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/30 hover:scale-[1.02] transition-transform"
+            className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 hover:scale-[1.02] transition-all"
           >
             <Sparkles className="w-4 h-4" />
             PITCH TRACK
@@ -177,22 +216,22 @@ export const ArtistDashboard: React.FC = () => {
       </div>
 
       {/* Hero Pitch Track Callout Option */}
-      <div className="card-sane p-6 rounded-2xl border border-[#BE1E2F]/40 bg-gradient-to-r from-[#241719] via-[#1a1a1a] to-[#1a1a1a] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div className="glass-panel p-6 rounded-3xl border border-white/10 bg-gradient-to-r from-spotify-green/10 via-surface to-surface flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-mono-code text-[#BE1E2F] font-bold">
+          <div className="flex items-center gap-2 text-xs font-sans text-spotify-green font-bold">
             <Zap className="w-4 h-4 fill-current" />
             <span>ARTIST CAMPAIGN HUB</span>
           </div>
-          <h2 className="text-xl font-title font-bold text-white">
+          <h2 className="text-xl font-display font-bold text-white">
             PITCH YOUR TRACK TO SPOTIFY PLAYLIST CURATORS
           </h2>
-          <p className="text-xs text-white/60 font-mono-code max-w-2xl leading-relaxed">
+          <p className="text-xs text-white/60 font-sans max-w-2xl leading-relaxed">
             Submit your unreleased cuts or latest releases directly to verified tastemakers. Choose free submissions with completed follower gates or guaranteed 48-hour premium review.
           </p>
         </div>
         <button
           onClick={() => openPitchModal()}
-          className="btn-sane text-xs px-6 py-3.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-xl shadow-[#BE1E2F]/30 whitespace-nowrap"
+          className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center gap-2 cursor-pointer shadow-xl shadow-spotify-green/25 whitespace-nowrap transition-colors"
         >
           <Music2 className="w-4 h-4" />
           PITCH TRACK NOW
@@ -201,61 +240,61 @@ export const ArtistDashboard: React.FC = () => {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card-sane p-4 rounded-xl border border-[#3a3a3a]">
-          <div className="text-[11px] text-white/50 font-mono-code flex items-center justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface">
+          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
             <span>TOTAL CAMPAIGNS</span>
-            <Music2 className="w-3.5 h-3.5 text-[#BE1E2F]" />
+            <Music2 className="w-4 h-4 text-spotify-green" />
           </div>
-          <div className="text-2xl font-bold font-title text-white mt-1">
+          <div className="text-2xl font-bold font-display text-white mt-1">
             {artistSubmissions.length}
           </div>
-          <div className="text-[10px] text-white/40 font-mono-code mt-0.5">Track Pitches Sent</div>
+          <div className="text-[10px] text-white/40 font-sans mt-0.5">Track Pitches Sent</div>
         </div>
 
-        <div className="card-sane p-4 rounded-xl border border-[#3a3a3a]">
-          <div className="text-[11px] text-white/50 font-mono-code flex items-center justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface">
+          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
             <span>ACTIVE PLACEMENTS</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold font-title text-emerald-400 mt-1">
+          <div className="text-2xl font-bold font-display text-emerald-400 mt-1">
             {totalPlaced}
           </div>
-          <div className="text-[10px] text-emerald-400/60 font-mono-code mt-0.5">
+          <div className="text-[10px] text-emerald-400/60 font-sans mt-0.5">
             Added to Playlists
           </div>
         </div>
 
-        <div className="card-sane p-4 rounded-xl border border-[#3a3a3a]">
-          <div className="text-[11px] text-white/50 font-mono-code flex items-center justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface">
+          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
             <span>PENDING REVIEWS</span>
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <Clock className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-bold font-title text-amber-300 mt-1">
+          <div className="text-2xl font-bold font-display text-amber-300 mt-1">
             {totalPending}
           </div>
-          <div className="text-[10px] text-amber-400/60 font-mono-code mt-0.5">In Curator Inboxes</div>
+          <div className="text-[10px] text-amber-400/60 font-sans mt-0.5">In Curator Inboxes</div>
         </div>
 
-        <div className="card-sane p-4 rounded-xl border border-[#3a3a3a]">
-          <div className="text-[11px] text-white/50 font-mono-code flex items-center justify-between">
+        <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface">
+          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
             <span>ACCEPTANCE RATE</span>
-            <TrendingUp className="w-3.5 h-3.5 text-[#BE1E2F]" />
+            <TrendingUp className="w-4 h-4 text-spotify-green" />
           </div>
-          <div className="text-2xl font-bold font-title text-white mt-1">
+          <div className="text-2xl font-bold font-display text-white mt-1">
             {placementRate}%
           </div>
-          <div className="text-[10px] text-white/40 font-mono-code mt-0.5">Conversion to Playlist</div>
+          <div className="text-[10px] text-white/40 font-sans mt-0.5">Conversion to Playlist</div>
         </div>
       </div>
 
       {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-[#3a3a3a] pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
         <button
           onClick={() => setActiveTab('campaigns')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
             activeTab === 'campaigns'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+              ? 'bg-spotify-green text-black font-bold shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white glass-panel'
           }`}
         >
           <Music2 className="w-3.5 h-3.5" />
@@ -264,22 +303,22 @@ export const ArtistDashboard: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('recommendations')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
             activeTab === 'recommendations'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+              ? 'bg-spotify-green text-black font-bold shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white glass-panel'
           }`}
         >
-          <Target className="w-3.5 h-3.5 text-[#BE1E2F]" />
+          <Target className="w-3.5 h-3.5" />
           SMART PLAYLIST MATCHES
         </button>
 
         <button
           onClick={() => setActiveTab('catalog')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
             activeTab === 'catalog'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+              ? 'bg-spotify-green text-black font-bold shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white glass-panel'
           }`}
         >
           <Radio className="w-3.5 h-3.5" />
@@ -288,10 +327,10 @@ export const ArtistDashboard: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
             activeTab === 'analytics'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+              ? 'bg-spotify-green text-black font-bold shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white glass-panel'
           }`}
         >
           <BarChart3 className="w-3.5 h-3.5" />
@@ -300,10 +339,10 @@ export const ArtistDashboard: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('wallet')}
-          className={`px-4 py-2 rounded-lg text-xs font-title tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
             activeTab === 'wallet'
-              ? 'bg-[#BE1E2F] text-white font-bold'
-              : 'text-white/60 hover:text-white card-panel'
+              ? 'bg-spotify-green text-black font-bold shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white glass-panel'
           }`}
         >
           <Coins className="w-3.5 h-3.5" />
@@ -316,35 +355,35 @@ export const ArtistDashboard: React.FC = () => {
         <div className="space-y-4">
           {/* Filter Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1 bg-[#2b2b2b] p-1 rounded-xl border border-[#3a3a3a] overflow-x-auto">
+            <div className="flex items-center gap-1.5 bg-surface p-1 rounded-2xl border border-white/10 overflow-x-auto">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code whitespace-nowrap ${
-                  statusFilter === 'all' ? 'bg-[#BE1E2F] text-white font-bold' : 'text-white/70'
+                className={`px-3 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap cursor-pointer transition-colors ${
+                  statusFilter === 'all' ? 'bg-spotify-green text-black font-bold shadow-sm' : 'text-white/70 hover:text-white'
                 }`}
               >
                 All ({artistSubmissions.length})
               </button>
               <button
                 onClick={() => setStatusFilter('placed')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code whitespace-nowrap ${
-                  statusFilter === 'placed' ? 'bg-emerald-600 text-white font-bold' : 'text-white/70'
+                className={`px-3 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap cursor-pointer transition-colors ${
+                  statusFilter === 'placed' ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'text-white/70 hover:text-white'
                 }`}
               >
                 Accepted / Placed ({totalPlaced})
               </button>
               <button
                 onClick={() => setStatusFilter('pending')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code whitespace-nowrap ${
-                  statusFilter === 'pending' ? 'bg-amber-600 text-white font-bold' : 'text-white/70'
+                className={`px-3 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap cursor-pointer transition-colors ${
+                  statusFilter === 'pending' ? 'bg-amber-600 text-white font-bold shadow-sm' : 'text-white/70 hover:text-white'
                 }`}
               >
                 Pending ({totalPending})
               </button>
               <button
                 onClick={() => setStatusFilter('declined')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code whitespace-nowrap ${
-                  statusFilter === 'declined' ? 'bg-rose-700 text-white font-bold' : 'text-white/70'
+                className={`px-3 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap cursor-pointer transition-colors ${
+                  statusFilter === 'declined' ? 'bg-rose-600 text-white font-bold shadow-sm' : 'text-white/70 hover:text-white'
                 }`}
               >
                 Feedback Received
@@ -358,32 +397,32 @@ export const ArtistDashboard: React.FC = () => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search campaigns..."
-                className="w-full bg-[#2b2b2b] text-white pl-9 pr-3 py-2 rounded-xl border border-[#3a3a3a] text-xs font-mono-code placeholder:text-white/40 focus:outline-none focus:border-[#BE1E2F]"
+                className="w-full bg-surface text-white pl-9 pr-3 py-2 rounded-xl border border-white/10 text-xs font-sans placeholder:text-white/40 focus:outline-none focus:border-spotify-green transition-colors"
               />
             </div>
           </div>
 
           {/* Submissions Table / Cards */}
           {filteredSubmissions.length === 0 ? (
-            <div className="card-sane p-12 text-center rounded-xl border border-[#3a3a3a]">
+            <div className="glass-panel p-12 text-center rounded-3xl border border-white/10 bg-surface">
               <Music2 className="w-10 h-10 text-white/20 mx-auto mb-2" />
-              <h3 className="text-base font-title text-white">No campaigns found</h3>
-              <p className="text-xs text-white/50 font-mono-code mt-1">
+              <h3 className="text-base font-display text-white">No campaigns found</h3>
+              <p className="text-xs text-white/50 font-sans mt-1">
                 You haven't pitched any songs matching this status filter.
               </p>
               <button
                 onClick={() => openPitchModal()}
-                className="btn-sane text-xs px-4 py-2 rounded-lg font-bold mt-4 cursor-pointer"
+                className="h-10 px-5 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-xl mt-4 cursor-pointer transition-colors shadow-md shadow-spotify-green/20"
               >
                 Pitch Your First Song
               </button>
             </div>
           ) : (
-            <div className="card-sane rounded-2xl border border-[#3a3a3a] overflow-hidden">
+            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden bg-surface">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-[#1a1a1a] border-b border-[#3a3a3a] text-[10px] font-mono-code text-white/50 uppercase">
+                    <tr className="bg-surface-hover/60 border-b border-white/10 text-[10px] font-sans text-white/50 uppercase tracking-wider">
                       <th className="p-4">Track</th>
                       <th className="p-4">Target Playlist</th>
                       <th className="p-4">Tier</th>
@@ -392,17 +431,17 @@ export const ArtistDashboard: React.FC = () => {
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#3a3a3a]/60 text-xs font-mono-code">
+                  <tbody className="divide-y divide-white/10 text-xs font-sans">
                     {filteredSubmissions.map(sub => {
                       const isPlayingThis =
                         audioState.isPlaying && audioState.currentTrack?.id === sub.track.id;
 
                       return (
-                        <tr key={sub.id} className="hover:bg-[#1a1a1a]/70 transition-colors">
+                        <tr key={sub.id} className="hover:bg-surface-hover/50 transition-colors">
                           {/* Track Column */}
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-[#3a3a3a]">
+                              <div className="relative w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-sm">
                                 <img
                                   src={sub.track.albumArt}
                                   alt={sub.track.title}
@@ -414,17 +453,17 @@ export const ArtistDashboard: React.FC = () => {
                                     if (isPlayingThis) pauseTrack();
                                     else playTrack(sub.track, sub.playlistTitle);
                                   }}
-                                  className="absolute inset-0 bg-black/40 hover:bg-black/70 flex items-center justify-center text-white cursor-pointer"
+                                  className="absolute inset-0 bg-black/40 hover:bg-black/70 flex items-center justify-center text-white cursor-pointer transition-colors"
                                 >
                                   {isPlayingThis ? (
-                                    <Pause className="w-4 h-4 fill-current text-[#BE1E2F]" />
+                                    <Pause className="w-4 h-4 fill-current text-spotify-green" />
                                   ) : (
                                     <Play className="w-4 h-4 fill-current ml-0.5" />
                                   )}
                                 </button>
                               </div>
                               <div className="min-w-0">
-                                <div className="font-bold text-white font-title text-xs truncate max-w-[160px]">
+                                <div className="font-bold text-white font-display text-xs truncate max-w-[160px]">
                                   {sub.track.title}
                                 </div>
                                 <div className="text-[10px] text-white/50 truncate">
@@ -440,7 +479,7 @@ export const ArtistDashboard: React.FC = () => {
                               <img
                                 src={sub.playlistCover}
                                 alt={sub.playlistTitle}
-                                className="w-7 h-7 rounded object-cover border border-[#3a3a3a]"
+                                className="w-8 h-8 rounded-lg object-cover border border-white/10 shadow-sm"
                                 referrerPolicy="no-referrer"
                               />
                               <div className="min-w-0">
@@ -457,11 +496,11 @@ export const ArtistDashboard: React.FC = () => {
                           {/* Tier Column */}
                           <td className="p-4">
                             {sub.pitchType === 'premium' ? (
-                              <span className="px-2 py-0.5 rounded bg-[#BE1E2F]/20 text-[#BE1E2F] text-[10px] font-bold border border-[#BE1E2F]/30">
+                              <span className="px-2.5 py-0.5 rounded-full bg-spotify-green/20 text-spotify-green text-[10px] font-bold border border-spotify-green/30">
                                 PREMIUM ⭐
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
                                 FREE
                               </span>
                             )}
@@ -494,7 +533,7 @@ export const ArtistDashboard: React.FC = () => {
                                   {sub.feedbackTags.map(tag => (
                                     <span
                                       key={tag}
-                                      className="px-1.5 py-0.2 rounded bg-[#1a1a1a] text-[9px] text-white/70 border border-[#3a3a3a]"
+                                      className="px-2 py-0.5 rounded-md bg-surface-hover text-[9px] text-white/70 border border-white/10"
                                     >
                                       {tag}
                                     </span>
@@ -525,14 +564,14 @@ export const ArtistDashboard: React.FC = () => {
                                 href={sub.spotifyPlacementUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="btn-sane text-[10px] px-2.5 py-1 rounded-md inline-flex items-center gap-1 font-bold"
+                                className="h-8 px-3 rounded-xl bg-spotify-green hover:bg-spotify-green-hover text-black text-[10px] inline-flex items-center gap-1 font-bold transition-colors cursor-pointer"
                               >
                                 View on Spotify <ExternalLink className="w-3 h-3" />
                               </a>
                             ) : (
                               <button
                                 onClick={() => openPitchModal(playlists.find(p => p.id === sub.playlistId))}
-                                className="card-panel text-[10px] px-2.5 py-1 rounded-md text-white/70 hover:text-white font-mono-code"
+                                className="h-8 px-3 rounded-xl bg-surface-hover border border-white/10 text-[10px] text-white/70 hover:text-white hover:border-white/20 transition-colors font-sans cursor-pointer"
                               >
                                 Re-Pitch Track
                               </button>
@@ -552,21 +591,21 @@ export const ArtistDashboard: React.FC = () => {
       {/* TAB 2: Smart Playlist Matches */}
       {activeTab === 'recommendations' && (
         <div className="space-y-4">
-          <div className="card-panel p-5 rounded-2xl border border-[#3a3a3a] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="glass-panel p-6 rounded-3xl border border-white/10 bg-surface flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-mono-code text-[#BE1E2F] font-bold">
+              <div className="flex items-center gap-2 text-xs font-sans text-spotify-green font-bold">
                 <Sparkles className="w-4 h-4" /> AI SOUND MATCHING ENGINE
               </div>
-              <h3 className="text-base font-title text-white mt-0.5">
+              <h3 className="text-base font-display font-bold text-white mt-0.5">
                 TOP CURATORS COMPATIBLE WITH YOUR SOUND
               </h3>
-              <p className="text-xs text-white/60 font-mono-code mt-1">
+              <p className="text-xs text-white/60 font-sans mt-1">
                 Analyzed based on your BPM ({artistTracks[0]?.bpm || 124}), genre ({artistTracks[0]?.genre || 'Deep House'}), and historical curator approvals.
               </p>
             </div>
             <button
               onClick={() => openPitchModal()}
-              className="btn-sane text-xs px-5 py-2.5 rounded-xl font-bold whitespace-nowrap"
+              className="h-11 px-5 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-2xl whitespace-nowrap cursor-pointer transition-colors shadow-md shadow-spotify-green/20"
             >
               Batch Pitch Recommended
             </button>
@@ -576,37 +615,37 @@ export const ArtistDashboard: React.FC = () => {
             {recommendedPlaylists.map(({ playlist, matchScore }) => (
               <div
                 key={playlist.id}
-                className="card-sane p-5 rounded-2xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all space-y-4 shadow-lg"
+                className="glass-panel p-5 rounded-3xl border border-white/10 hover:border-spotify-green/50 transition-all space-y-4 shadow-lg bg-surface"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3.5">
                     <img
                       src={playlist.coverArt}
                       alt={playlist.title}
-                      className="w-16 h-16 rounded-xl object-cover border border-[#3a3a3a]"
+                      className="w-16 h-16 rounded-2xl object-cover border border-white/10 shadow-sm"
                       referrerPolicy="no-referrer"
                     />
                     <div>
-                      <h4 className="text-sm font-bold font-title text-white truncate max-w-[200px]">
+                      <h4 className="text-sm font-bold font-display text-white truncate max-w-[200px]">
                         {playlist.title}
                       </h4>
-                      <div className="text-xs text-white/60 font-mono-code">
+                      <div className="text-xs text-white/60 font-sans">
                         Curator: {playlist.curatorName}
                       </div>
-                      <div className="text-[10px] text-emerald-400 font-mono-code font-bold mt-1">
+                      <div className="text-[10px] text-emerald-400 font-sans font-bold mt-1">
                         ● {playlist.followerCount.toLocaleString()} Active Followers
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#BE1E2F]/20 text-[#BE1E2F] text-xs font-bold font-mono-code border border-[#BE1E2F]/40">
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-spotify-green/20 text-spotify-green text-xs font-bold font-sans border border-spotify-green/40">
                       <Flame className="w-3 h-3" /> {matchScore}% MATCH
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-[#1a1a1a] p-3 rounded-xl border border-[#3a3a3a] flex items-center justify-between text-xs font-mono-code">
+                <div className="bg-surface-hover/70 p-3 rounded-2xl border border-white/10 flex items-center justify-between text-xs font-sans">
                   <div>
                     <span className="text-white/40">Approval: </span>
                     <strong className="text-emerald-400">{playlist.approvalRate}%</strong>
@@ -624,7 +663,7 @@ export const ArtistDashboard: React.FC = () => {
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex flex-wrap gap-1">
                     {playlist.genres.slice(0, 2).map(g => (
-                      <span key={g} className="px-2 py-0.5 rounded bg-[#2b2b2b] text-[10px] font-mono-code text-white/70">
+                      <span key={g} className="px-2 py-0.5 rounded-md bg-surface-hover text-[10px] font-sans text-white/70 border border-white/5">
                         {g}
                       </span>
                     ))}
@@ -632,7 +671,7 @@ export const ArtistDashboard: React.FC = () => {
 
                   <button
                     onClick={() => openPitchModal(playlist)}
-                    className="btn-sane text-xs px-4 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                    className="h-9 px-4 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
                   >
                     <Sparkles className="w-3.5 h-3.5" /> Pitch Track
                   </button>
@@ -648,14 +687,14 @@ export const ArtistDashboard: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-title text-white">RELEASES READY FOR PITCHING</h3>
-              <p className="text-xs text-white/60 font-mono-code">
+              <h3 className="text-sm font-display font-bold text-white">RELEASES READY FOR PITCHING</h3>
+              <p className="text-xs text-white/60 font-sans">
                 Manage your songs, audio previews, BPM metadata, and direct pitch actions.
               </p>
             </div>
             <button
               onClick={() => setShowAddTrackModal(true)}
-              className="btn-sane text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+              className="h-10 px-4 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
             >
               <Plus className="w-4 h-4" /> Add Release URL
             </button>
@@ -665,10 +704,10 @@ export const ArtistDashboard: React.FC = () => {
             {artistTracks.map(trk => (
               <div
                 key={trk.id}
-                className="card-sane p-4 rounded-xl border border-[#3a3a3a] flex items-center justify-between group hover:border-[#BE1E2F] transition-all shadow-md"
+                className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between group hover:border-spotify-green/40 transition-all shadow-md bg-surface"
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 border border-[#3a3a3a]">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-sm">
                     <img
                       src={trk.albumArt}
                       alt={trk.title}
@@ -677,19 +716,19 @@ export const ArtistDashboard: React.FC = () => {
                     />
                     <button
                       onClick={() => playTrack(trk)}
-                      className="absolute inset-0 bg-black/40 hover:bg-black/70 flex items-center justify-center text-white cursor-pointer"
+                      className="absolute inset-0 bg-black/40 hover:bg-black/70 flex items-center justify-center text-white cursor-pointer transition-colors"
                     >
                       <Play className="w-5 h-5 fill-current ml-0.5" />
                     </button>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold font-title text-white group-hover:text-[#BE1E2F] transition-colors">
+                    <h4 className="text-sm font-bold font-display text-white group-hover:text-spotify-green transition-colors">
                       {trk.title}
                     </h4>
-                    <div className="text-xs text-white/60 font-mono-code">
+                    <div className="text-xs text-white/60 font-sans">
                       {trk.artist} • {trk.genre}
                     </div>
-                    <div className="text-[10px] text-white/40 font-mono-code mt-0.5">
+                    <div className="text-[10px] text-white/40 font-sans mt-0.5">
                       BPM: {trk.bpm || 124} | Key: {trk.key || 'D Minor'} | Released: {trk.releaseDate}
                     </div>
                   </div>
@@ -700,14 +739,14 @@ export const ArtistDashboard: React.FC = () => {
                     href={trk.spotifyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2 rounded-lg bg-[#1a1a1a] border border-[#3a3a3a] text-white/60 hover:text-white hover:border-[#BE1E2F]"
+                    className="p-2 rounded-xl bg-surface-hover border border-white/10 text-white/60 hover:text-white hover:border-spotify-green transition-colors"
                     title="Spotify link"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
                   <button
                     onClick={() => openPitchModal()}
-                    className="btn-sane text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer"
+                    className="h-8 px-3.5 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-sm"
                   >
                     Pitch
                   </button>
@@ -728,39 +767,39 @@ export const ArtistDashboard: React.FC = () => {
       {/* TAB 5: Wallet & Receipts */}
       {activeTab === 'wallet' && (
         <div className="space-y-6">
-          <div className="card-panel p-6 rounded-2xl border border-[#3a3a3a] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface">
             <div>
-              <div className="text-xs font-mono-code text-[#BE1E2F] font-bold">WALLET BALANCE</div>
-              <div className="text-3xl font-bold font-title text-white mt-1">
+              <div className="text-xs font-sans text-spotify-green font-bold">WALLET BALANCE</div>
+              <div className="text-3xl font-bold font-display text-white mt-1">
                 {currentUser.creditBalance} Credits
               </div>
-              <p className="text-xs text-white/60 font-mono-code mt-1">
+              <p className="text-xs text-white/60 font-sans mt-1">
                 Use credits for 1-click guaranteed curator pitches, feedback tags, and priority delivery.
               </p>
             </div>
             <button
               onClick={() => setBuyCreditsModalOpen(true)}
-              className="btn-sane text-xs px-6 py-3 rounded-xl font-bold shadow-lg shadow-[#BE1E2F]/20 cursor-pointer"
+              className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-xs rounded-2xl shadow-lg shadow-spotify-green/20 cursor-pointer transition-colors whitespace-nowrap"
             >
               PURCHASE CREDIT BUNDLE
             </button>
           </div>
 
           <div>
-            <h3 className="text-xs font-title tracking-wider text-white mb-3">
+            <h3 className="text-xs font-display tracking-wider text-white mb-3 font-bold uppercase">
               TRANSACTION HISTORY & PAYPAL RECEIPTS
             </h3>
-            <div className="card-sane rounded-xl border border-[#3a3a3a] divide-y divide-[#3a3a3a]/60">
+            <div className="glass-panel rounded-2xl border border-white/10 divide-y divide-white/10 overflow-hidden bg-surface">
               {transactions.length === 0 ? (
-                <div className="p-8 text-center text-xs font-mono-code text-white/50">
+                <div className="p-8 text-center text-xs font-sans text-white/50">
                   No transactions yet.
                 </div>
               ) : (
                 transactions.map(tx => (
-                  <div key={tx.id} className="p-4 flex items-center justify-between text-xs font-mono-code">
+                  <div key={tx.id} className="p-4 flex items-center justify-between text-xs font-sans">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                           tx.amount > 0
                             ? 'bg-emerald-500/20 text-emerald-400'
                             : 'bg-rose-500/20 text-rose-300'
@@ -788,7 +827,7 @@ export const ArtistDashboard: React.FC = () => {
                         {tx.amount > 0 ? `+${tx.amount}` : tx.amount} Credits
                       </div>
                       {tx.paypalAmountUsd && (
-                        <div className="text-[10px] text-[#0070BA] font-mono-code flex items-center justify-end gap-1">
+                        <div className="text-[10px] text-[#0070BA] font-sans flex items-center justify-end gap-1">
                           <span>${tx.paypalAmountUsd.toFixed(2)} USD via PayPal</span>
                         </div>
                       )}
@@ -803,22 +842,22 @@ export const ArtistDashboard: React.FC = () => {
 
       {/* Add Track Modal Form */}
       {showAddTrackModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="card-sane w-full max-w-md rounded-2xl border border-[#3a3a3a] shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#3a3a3a]">
-              <div className="text-sm font-title text-white flex items-center gap-2">
-                <Music2 className="w-4 h-4 text-[#BE1E2F]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-panel w-full max-w-md rounded-3xl border border-white/10 shadow-2xl p-6 space-y-4 bg-surface">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="text-sm font-display font-bold text-white flex items-center gap-2">
+                <Music2 className="w-4 h-4 text-spotify-green" />
                 ADD TRACK TO CATALOG
               </div>
               <button
                 onClick={() => setShowAddTrackModal(false)}
-                className="text-white/60 hover:text-white"
+                className="text-white/60 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddTrack} className="space-y-4 text-xs font-mono-code">
+            <form onSubmit={handleAddTrack} className="space-y-4 text-xs font-sans">
               <div>
                 <label className="text-white/80 block mb-1">Track Title</label>
                 <input
@@ -827,7 +866,7 @@ export const ArtistDashboard: React.FC = () => {
                   value={newTrackTitle}
                   onChange={e => setNewTrackTitle(e.target.value)}
                   placeholder="e.g. Midnight Mirage"
-                  className="w-full bg-[#1a1a1a] text-white px-3 py-2 rounded-xl border border-[#3a3a3a] focus:outline-none focus:border-[#BE1E2F]"
+                  className="w-full bg-surface-hover text-white px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-spotify-green transition-colors"
                 />
               </div>
 
@@ -837,7 +876,7 @@ export const ArtistDashboard: React.FC = () => {
                   <select
                     value={newTrackGenre}
                     onChange={e => setNewTrackGenre(e.target.value)}
-                    className="w-full bg-[#1a1a1a] text-white px-3 py-2 rounded-xl border border-[#3a3a3a] focus:outline-none focus:border-[#BE1E2F]"
+                    className="w-full bg-surface-hover text-white px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-spotify-green transition-colors"
                   >
                     <option value="Deep House">Deep House</option>
                     <option value="Melodic Techno">Melodic Techno</option>
@@ -855,7 +894,7 @@ export const ArtistDashboard: React.FC = () => {
                     type="number"
                     value={newTrackBpm}
                     onChange={e => setNewTrackBpm(Number(e.target.value))}
-                    className="w-full bg-[#1a1a1a] text-white px-3 py-2 rounded-xl border border-[#3a3a3a] focus:outline-none focus:border-[#BE1E2F]"
+                    className="w-full bg-surface-hover text-white px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-spotify-green transition-colors"
                   />
                 </div>
               </div>
@@ -867,21 +906,21 @@ export const ArtistDashboard: React.FC = () => {
                   value={newTrackSpotifyUrl}
                   onChange={e => setNewTrackSpotifyUrl(e.target.value)}
                   placeholder="https://open.spotify.com/track/..."
-                  className="w-full bg-[#1a1a1a] text-white px-3 py-2 rounded-xl border border-[#3a3a3a] focus:outline-none focus:border-[#BE1E2F]"
+                  className="w-full bg-surface-hover text-white px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-spotify-green transition-colors"
                 />
               </div>
 
-              <div className="pt-3 border-t border-[#3a3a3a] flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowAddTrackModal(false)}
-                  className="text-white/60 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-white/60 hover:text-white font-sans text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-sane text-xs px-5 py-2.5 rounded-xl font-bold cursor-pointer"
+                  className="h-10 px-5 bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-sm"
                 >
                   Save Track
                 </button>

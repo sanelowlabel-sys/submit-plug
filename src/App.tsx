@@ -12,8 +12,10 @@ import { HowItWorks } from './components/landing/HowItWorks';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { ArtistDashboard } from './components/artist/ArtistDashboard';
 import { CuratorDashboard } from './components/curator/CuratorDashboard';
+import { UserDashboard } from './components/dashboard/UserDashboard';
 import { ProfileView } from './components/profile/ProfileView';
 import { PitchFlowModal } from './components/artist/PitchFlowModal';
+import { SpotifySubmissionWizardModal } from './components/modals/SpotifySubmissionWizardModal';
 import { BuyCreditsModal } from './components/modals/BuyCreditsModal';
 import { OnboardPlaylistModal } from './components/modals/OnboardPlaylistModal';
 import { GlobalAudioPlayer } from './components/player/GlobalAudioPlayer';
@@ -24,7 +26,7 @@ const MainContent: React.FC = () => {
   const { activeTab, activeRole } = useApp();
 
   return (
-    <main className="min-h-screen bg-[#1a1a1a] text-white flex flex-col justify-between pb-24">
+    <main className="min-h-screen bg-[#121212] text-white flex flex-col justify-between pb-24">
       <Navbar />
 
       <div className="flex-1">
@@ -42,9 +44,7 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'dashboard' && (
-          activeRole === 'curator' ? <CuratorDashboard /> : <ArtistDashboard />
-        )}
+        {activeTab === 'dashboard' && <UserDashboard />}
 
         {(activeTab === 'artist' || (activeTab as string) === 'artist_dashboard') && <ArtistDashboard />}
 
@@ -57,6 +57,7 @@ const MainContent: React.FC = () => {
 
       {/* Global Modals & Player & Notifications */}
       <AuthModal />
+      <SpotifySubmissionWizardModal />
       <PitchFlowModal />
       <BuyCreditsModal />
       <OnboardPlaylistModal />

@@ -71,6 +71,8 @@ playlistsRouter.post('/', (req: Request, res: Response) => {
   }
 
   const spotifyId = extractSpotifyId(spotifyUrl, 'playlist') || `spotify_pl_${Date.now()}`;
+  const dbTracks = db.getTracks();
+  const defaultSpotlight = dbTracks.length > 0 ? dbTracks[Math.floor(Math.random() * dbTracks.length)] : undefined;
 
   const created = db.createPlaylist({
     title,
@@ -93,6 +95,7 @@ playlistsRouter.post('/', (req: Request, res: Response) => {
     isFeatured: false,
     acceptingSubmissions: true,
     lastActiveAt: 'Just now',
+    spotlightTrack: req.body.spotlightTrack || defaultSpotlight,
     gates: gates || {
       requireCuratorFollow: true,
       requirePlaylistFollow: true,

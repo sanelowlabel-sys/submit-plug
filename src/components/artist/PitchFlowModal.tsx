@@ -23,6 +23,7 @@ import {
   LogIn,
   Loader2
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { globalAudioEngine } from '../../utils/audioEngine';
 import { fetchSpotifyMetadata, convertSpotifyMetadataToTrack } from '../../utils/spotifyParser';
 
@@ -39,6 +40,8 @@ export const PitchFlowModal: React.FC = () => {
     freeWeeklyCredits,
     setBuyCreditsModalOpen,
     playTrack,
+    pauseTrack,
+    audioState,
     verifyGateAction,
     openLoginModal,
     openRegisterModal
@@ -85,8 +88,6 @@ export const PitchFlowModal: React.FC = () => {
     }
   }, [artistTracks, selectedTrack]);
 
-  if (!pitchModalOpen) return null;
-
   const targetPlaylist = playlists.find(p => p.id === selectedPlaylistId) || playlists[0] || {
     id: 'pl_default',
     title: 'Top Hits Discovery',
@@ -104,6 +105,27 @@ export const PitchFlowModal: React.FC = () => {
     }
   };
 
+  // Sync spotlight listening progress with global footer audio player
+  useEffect(() => {
+    if (!pitchModalOpen) return;
+    if (
+      targetPlaylist.spotlightTrack &&
+      audioState.currentTrack?.id === targetPlaylist.spotlightTrack.id &&
+      audioState.isPlaying
+    ) {
+      setSpotlightListening(true);
+      const current = Math.min(SPOTLIGHT_REQUIRED_SEC, Math.floor(audioState.currentTime));
+      setSpotlightElapsedSec(current);
+      if (audioState.currentTime >= SPOTLIGHT_REQUIRED_SEC) {
+        setGateSavedSong(true);
+      }
+    } else if (audioState.currentTrack?.id === targetPlaylist.spotlightTrack?.id && !audioState.isPlaying) {
+      setSpotlightListening(false);
+    }
+  }, [audioState.currentTrack?.id, audioState.isPlaying, audioState.currentTime, targetPlaylist.spotlightTrack, pitchModalOpen]);
+
+  if (!pitchModalOpen) return null;
+
   const cost = pitchType === 'premium' ? (targetPlaylist.pitchCostCredits || 1) : 0;
   const hasEnoughCredits = (currentUser?.creditBalance ?? 0) >= cost;
   const isFreeSpotlightComplete = spotlightElapsedSec >= SPOTLIGHT_REQUIRED_SEC;
@@ -118,25 +140,15 @@ export const PitchFlowModal: React.FC = () => {
     (!needsPlaylistFollow || gateFollowedPlaylist) &&
     (!needsSongSave || gateSavedSong);
 
-  // Spotlight Listen Engine
+  // Spotlight Listen Engine (routes through Global Footer Player)
   const startSpotlightListen = () => {
     if (!targetPlaylist.spotlightTrack) return;
     setSpotlightListening(true);
-
-    globalAudioEngine.playTrack(
-      targetPlaylist.spotlightTrack,
-      (current) => {
-        setSpotlightElapsedSec(Math.min(SPOTLIGHT_REQUIRED_SEC, Math.floor(current)));
-      },
-      () => {
-        setSpotlightListening(false);
-        setSpotlightElapsedSec(SPOTLIGHT_REQUIRED_SEC);
-      }
-    );
+    playTrack(targetPlaylist.spotlightTrack, `Spotlight: ${targetPlaylist.title}`);
   };
 
   const pauseSpotlightListen = () => {
-    globalAudioEngine.stop();
+    pauseTrack();
     setSpotlightListening(false);
   };
 
@@ -250,26 +262,32 @@ export const PitchFlowModal: React.FC = () => {
 
     if (res.success) {
       setStep('success');
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#1DB954', '#ffffff', '#1ed760']
+      });
     } else {
       setStatusMessage({ type: 'error', text: res.message });
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="card-sane w-full max-w-2xl rounded-2xl border border-[#3a3a3a] shadow-2xl overflow-hidden my-8 bg-[#161616]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+      <div className="glass-panel w-full max-w-2xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden my-8 bg-surface">
         {/* Header with Brand Logo */}
-        <div className="px-6 py-4 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1f1f1f]">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-surface-hover/50">
           <div className="flex items-center gap-3">
             <BrandLogo size={36} withBadge={false} alt="Brand Logo" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-title font-bold text-white tracking-wide">SUBMIT TRACK PITCH</h3>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono-code font-bold bg-[#BE1E2F]/20 text-[#BE1E2F] border border-[#BE1E2F]/30">
+                <h3 className="text-base font-display font-bold text-white tracking-wide">SUBMIT TRACK PITCH</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-sans font-bold bg-spotify-green/20 text-spotify-green border border-spotify-green/30">
                   REAL-TIME
                 </span>
               </div>
-              <div className="text-[11px] font-mono-code text-white/50">
+              <div className="text-xs font-sans text-white/50">
                 Direct Submission to Spotify Curators
               </div>
             </div>
@@ -279,7 +297,7 @@ export const PitchFlowModal: React.FC = () => {
               pauseSpotlightListen();
               closePitchModal();
             }}
-            className="w-8 h-8 rounded-lg bg-[#2b2b2b] border border-[#3a3a3a] text-white/60 hover:text-white flex items-center justify-center cursor-pointer"
+            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -293,10 +311,10 @@ export const PitchFlowModal: React.FC = () => {
               <BrandLogo size={60} alt="Brand Logo" />
             </div>
             <div className="space-y-2">
-              <h4 className="text-lg font-title font-bold text-white tracking-wide">
+              <h4 className="text-lg font-display font-bold text-white tracking-wide">
                 AUTHENTICATION REQUIRED TO PITCH
               </h4>
-              <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto">
+              <p className="text-xs text-white/60 font-sans max-w-md mx-auto">
                 Please sign in to submit your track to <span className="text-white font-bold">{targetPlaylist.title}</span> and track curator reviews in real-time.
               </p>
             </div>
@@ -306,7 +324,7 @@ export const PitchFlowModal: React.FC = () => {
                   closePitchModal();
                   openLoginModal();
                 }}
-                className="w-full sm:w-auto btn-sane px-6 py-2.5 rounded-xl font-title font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+                className="w-full sm:w-auto h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/25 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 SIGN IN NOW
@@ -316,7 +334,7 @@ export const PitchFlowModal: React.FC = () => {
                   closePitchModal();
                   openRegisterModal();
                 }}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-title font-bold text-xs bg-[#242424] text-white border border-[#3a3a3a] hover:border-[#BE1E2F] transition-colors cursor-pointer"
+                className="w-full sm:w-auto h-12 px-6 rounded-2xl font-bold text-xs bg-white text-black hover:scale-105 transition-transform cursor-pointer"
               >
                 CREATE ARTIST ACCOUNT
               </button>
@@ -327,20 +345,20 @@ export const PitchFlowModal: React.FC = () => {
           {step === 'select_track' && (
             <div className="space-y-5">
               {/* Target Playlist Banner */}
-              <div className="bg-[#1a1a1a] p-3.5 rounded-xl border border-[#3a3a3a] flex items-center justify-between">
+              <div className="glass-panel p-3.5 rounded-2xl border border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <img
                     src={targetPlaylist.coverArt}
                     alt={targetPlaylist.title}
-                    className="w-12 h-12 rounded-lg object-cover border border-[#3a3a3a]"
+                    className="w-12 h-12 rounded-xl object-cover border border-white/10"
                     referrerPolicy="no-referrer"
                   />
                   <div>
-                    <div className="text-[10px] font-mono-code text-[#BE1E2F] font-bold">TARGET PLAYLIST</div>
-                    <div className="text-sm font-bold text-white font-title truncate max-w-[240px] sm:max-w-xs">
+                    <div className="text-[10px] font-sans text-spotify-green font-bold uppercase tracking-wider">TARGET PLAYLIST</div>
+                    <div className="text-sm font-bold text-white font-display truncate max-w-[240px] sm:max-w-xs">
                       {targetPlaylist.title}
                     </div>
-                    <div className="text-xs text-white/60 font-mono-code">
+                    <div className="text-xs text-white/60 font-sans">
                       by {targetPlaylist.curatorName} • {targetPlaylist.followerCount.toLocaleString()} followers
                     </div>
                   </div>
@@ -349,7 +367,7 @@ export const PitchFlowModal: React.FC = () => {
                 <select
                   value={selectedPlaylistId}
                   onChange={e => setSelectedPlaylistId(e.target.value)}
-                  className="bg-[#2b2b2b] text-white text-xs font-mono-code py-1.5 px-3 rounded-lg border border-[#3a3a3a] focus:outline-none focus:border-[#BE1E2F] max-w-[140px]"
+                  className="bg-surface text-white text-xs font-sans py-2 px-3 rounded-xl border border-white/10 focus:outline-none focus:border-spotify-green max-w-[140px]"
                 >
                   {playlists.map(p => (
                     <option key={p.id} value={p.id}>
@@ -362,21 +380,21 @@ export const PitchFlowModal: React.FC = () => {
               {/* Step 1: Select Track */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-title tracking-wider text-white flex items-center gap-1.5">
-                    <Music2 className="w-3.5 h-3.5 text-[#BE1E2F]" />
+                  <label className="text-xs font-display tracking-wider text-white flex items-center gap-1.5">
+                    <Music2 className="w-3.5 h-3.5 text-spotify-green" />
                     SELECT SPOTIFY RELEASE TO PITCH
                   </label>
                   <button
                     onClick={() => setShowAddCustomTrack(!showAddCustomTrack)}
-                    className="text-[11px] font-mono-code text-[#BE1E2F] hover:underline cursor-pointer"
+                    className="text-xs font-sans text-spotify-green hover:underline cursor-pointer font-medium"
                   >
                     {showAddCustomTrack ? 'Pick from catalog' : '+ Paste Spotify URL'}
                   </button>
                 </div>
 
                 {showAddCustomTrack ? (
-                  <form onSubmit={handleAddTrackFromSpotify} className="card-panel p-3 rounded-xl space-y-2">
-                    <div className="text-xs text-white/70 font-mono-code">
+                  <form onSubmit={handleAddTrackFromSpotify} className="glass-panel p-4 rounded-2xl space-y-3 border border-white/10">
+                    <div className="text-xs text-white/70 font-sans">
                       Paste Spotify Track Link or URI:
                     </div>
                     <div className="flex gap-2">
@@ -385,12 +403,12 @@ export const PitchFlowModal: React.FC = () => {
                         value={customUrlInput}
                         onChange={e => setCustomUrlInput(e.target.value)}
                         placeholder="https://open.spotify.com/track/..."
-                        className="flex-1 bg-[#2b2b2b] text-white px-3 py-2 rounded-lg border border-[#3a3a3a] text-xs font-mono-code focus:outline-none focus:border-[#BE1E2F]"
+                        className="flex-1 bg-surface text-white px-4 py-3 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-spotify-green"
                       />
                       <button
                         type="submit"
                         disabled={isImportingTrack || !customUrlInput.trim()}
-                        className="btn-sane text-xs px-4 py-2 rounded-lg font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        className="h-11 px-5 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-xs rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                       >
                         {isImportingTrack ? (
                           <>
@@ -409,22 +427,22 @@ export const PitchFlowModal: React.FC = () => {
                       <div
                         key={trk.id}
                         onClick={() => setSelectedTrack(trk)}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
                           selectedTrack?.id === trk.id
-                            ? 'bg-[#BE1E2F]/15 border-[#BE1E2F] shadow-md'
-                            : 'card-panel hover:border-white/40'
+                            ? 'bg-spotify-green/15 border-spotify-green shadow-md'
+                            : 'glass-panel hover:border-white/40'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <img
                             src={trk.albumArt}
                             alt={trk.title}
-                            className="w-10 h-10 rounded-lg object-cover border border-[#3a3a3a]"
+                            className="w-10 h-10 rounded-xl object-cover border border-white/10"
                             referrerPolicy="no-referrer"
                           />
                           <div>
-                            <div className="text-xs font-bold text-white font-title">{trk.title}</div>
-                            <div className="text-[11px] text-white/60 font-mono-code">
+                            <div className="text-xs font-bold text-white font-display">{trk.title}</div>
+                            <div className="text-xs text-white/60 font-sans">
                               {trk.artist} • {trk.genre} • {trk.bpm || 124} BPM
                             </div>
                           </div>
@@ -435,15 +453,27 @@ export const PitchFlowModal: React.FC = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              playTrack(trk);
+                              if (audioState.currentTrack?.id === trk.id && audioState.isPlaying) {
+                                pauseTrack();
+                              } else {
+                                playTrack(trk);
+                              }
                             }}
-                            className="p-1.5 rounded-lg bg-[#2b2b2b] text-white/70 hover:text-white hover:border-[#BE1E2F] border border-[#3a3a3a] cursor-pointer"
-                            title="Preview track"
+                            className={`p-2 rounded-xl border cursor-pointer transition-colors ${
+                              audioState.currentTrack?.id === trk.id && audioState.isPlaying
+                                ? 'bg-spotify-green text-black border-spotify-green'
+                                : 'bg-white/5 text-white/70 hover:text-white hover:border-spotify-green border-white/10'
+                            }`}
+                            title={audioState.currentTrack?.id === trk.id && audioState.isPlaying ? 'Pause preview' : 'Preview track'}
                           >
-                            <Play className="w-3.5 h-3.5 fill-current" />
+                            {audioState.currentTrack?.id === trk.id && audioState.isPlaying ? (
+                              <Pause className="w-3.5 h-3.5 fill-current" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            )}
                           </button>
                           {selectedTrack?.id === trk.id && (
-                            <CheckCircle2 className="w-4 h-4 text-[#BE1E2F]" />
+                            <CheckCircle2 className="w-4 h-4 text-spotify-green" />
                           )}
                         </div>
                       </div>
@@ -453,11 +483,11 @@ export const PitchFlowModal: React.FC = () => {
               </div>
 
               {/* Action */}
-              <div className="pt-3 border-t border-[#3a3a3a] flex justify-end">
+              <div className="pt-3 border-t border-white/10 flex justify-end">
                 <button
                   disabled={!selectedTrack}
                   onClick={() => setStep('configure_pitch')}
-                  className="btn-sane text-xs px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                 >
                   Configure Pitch Options →
                 </button>
@@ -469,29 +499,29 @@ export const PitchFlowModal: React.FC = () => {
             <div className="space-y-5">
               {/* Pitch Type Selection */}
               <div>
-                <label className="text-xs font-title tracking-wider text-white mb-2 block">
+                <label className="text-xs font-display tracking-wider text-white mb-2 block font-bold">
                   CHOOSE SUBMISSION TIER
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Premium Option */}
                   <div
                     onClick={() => setPitchType('premium')}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                       pitchType === 'premium'
-                        ? 'bg-[#BE1E2F]/15 border-[#BE1E2F] shadow-lg shadow-[#BE1E2F]/15'
-                        : 'card-panel hover:border-white/30'
+                        ? 'bg-spotify-green/15 border-spotify-green shadow-lg shadow-spotify-green/15'
+                        : 'glass-panel hover:border-white/30'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded bg-[#BE1E2F] text-[9px] font-mono-code font-bold text-white">
+                      <span className="px-2 py-0.5 rounded-full bg-spotify-green text-[10px] font-sans font-bold text-black">
                         GUARANTEED REVIEW
                       </span>
-                      <div className="text-xs font-bold font-mono-code text-white">
+                      <div className="text-xs font-bold font-sans text-white">
                         {cost} Credit{cost > 1 ? 's' : ''}
                       </div>
                     </div>
-                    <div className="text-sm font-bold font-title text-white">PREMIUM PITCH</div>
-                    <ul className="text-[11px] text-white/70 font-mono-code mt-2 space-y-1">
+                    <div className="text-sm font-bold font-display text-white">PREMIUM PITCH</div>
+                    <ul className="text-xs text-white/70 font-sans mt-2 space-y-1">
                       <li>✓ Guaranteed 48h Curator Review</li>
                       <li>✓ Detailed Feedback Tags & Notes</li>
                       <li>✓ Direct Email Receipt & Live Status</li>
@@ -506,22 +536,22 @@ export const PitchFlowModal: React.FC = () => {
                         setPitchType('free');
                       }
                     }}
-                    className={`p-4 rounded-xl border transition-all ${
+                    className={`p-4 rounded-2xl border transition-all ${
                       !targetPlaylist.freePitchEnabled
-                        ? 'opacity-40 cursor-not-allowed card-panel'
+                        ? 'opacity-40 cursor-not-allowed glass-panel'
                         : pitchType === 'free'
-                        ? 'bg-[#BE1E2F]/15 border-[#BE1E2F] shadow-lg shadow-[#BE1E2F]/15 cursor-pointer'
-                        : 'card-panel hover:border-white/30 cursor-pointer'
+                        ? 'bg-spotify-green/15 border-spotify-green shadow-lg shadow-spotify-green/15 cursor-pointer'
+                        : 'glass-panel hover:border-white/30 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-mono-code font-bold">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-sans font-bold">
                         FREE WEEKLY ({freeWeeklyCredits}/2 REMAINING)
                       </span>
-                      <div className="text-xs font-bold font-mono-code text-emerald-400">0 Credits</div>
+                      <div className="text-xs font-bold font-sans text-emerald-400">0 Credits</div>
                     </div>
-                    <div className="text-sm font-bold font-title text-white">FREE GATE PITCH</div>
-                    <ul className="text-[11px] text-white/70 font-mono-code mt-2 space-y-1">
+                    <div className="text-sm font-bold font-display text-white">FREE GATE PITCH</div>
+                    <ul className="text-xs text-white/70 font-sans mt-2 space-y-1">
                       <li>• Complete Curator Follower Gates</li>
                       <li>• 2 Free Weekly Pitches per user</li>
                       <li>• Standard Curator Queue</li>
@@ -532,27 +562,27 @@ export const PitchFlowModal: React.FC = () => {
 
               {/* CURATOR FOLLOWER GATES (IF FREE PITCH) */}
               {pitchType === 'free' && (
-                <div className="bg-[#161616] p-4 rounded-xl border border-[#3a3a3a] space-y-3">
+                <div className="glass-panel p-4 rounded-2xl border border-white/10 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold font-title text-white flex items-center gap-1.5">
+                    <span className="text-xs font-bold font-display text-white flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
                       COMPLETE CURATOR FOLLOWER GATES
                     </span>
-                    <span className="text-[10px] font-mono-code text-white/50">
+                    <span className="text-[11px] font-sans text-white/50">
                       Supports Curator Playlist Growth
                     </span>
                   </div>
 
                   <div className="space-y-2">
                     {needsCuratorFollow && (
-                      <div className="p-3 rounded-lg bg-[#1f1f1f] border border-[#333] flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <UserPlus className="w-4 h-4 text-[#1DB954]" />
+                          <UserPlus className="w-4 h-4 text-spotify-green" />
                           <div>
-                            <div className="text-xs font-mono-code text-white font-bold">
+                            <div className="text-xs font-sans text-white font-bold">
                               Follow {targetPlaylist.curatorName}
                             </div>
-                            <div className="text-[10px] font-mono-code text-white/50">
+                            <div className="text-[11px] font-sans text-white/50">
                               Official Curator Spotify Account
                             </div>
                           </div>
@@ -566,10 +596,10 @@ export const PitchFlowModal: React.FC = () => {
                               targetPlaylist.gates?.curatorSpotifyProfileUrl || 'https://open.spotify.com'
                             )
                           }
-                          className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
                             gateFollowedCurator
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-[#1DB954] text-black hover:bg-[#1ed760]'
+                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
                           }`}
                         >
                           {gateFollowedCurator ? (
@@ -586,14 +616,14 @@ export const PitchFlowModal: React.FC = () => {
                     )}
 
                     {needsPlaylistFollow && (
-                      <div className="p-3 rounded-lg bg-[#1f1f1f] border border-[#333] flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Radio className="w-4 h-4 text-[#1DB954]" />
+                          <Radio className="w-4 h-4 text-spotify-green" />
                           <div>
-                            <div className="text-xs font-mono-code text-white font-bold">
+                            <div className="text-xs font-sans text-white font-bold">
                               Follow "{targetPlaylist.title}"
                             </div>
-                            <div className="text-[10px] font-mono-code text-white/50">
+                            <div className="text-[11px] font-sans text-white/50">
                               Saves playlist to your Spotify library
                             </div>
                           </div>
@@ -602,10 +632,10 @@ export const PitchFlowModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handlePerformGate('playlist_follow', targetPlaylist.spotifyUrl)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
                             gateFollowedPlaylist
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-[#1DB954] text-black hover:bg-[#1ed760]'
+                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
                           }`}
                         >
                           {gateFollowedPlaylist ? (
@@ -622,14 +652,14 @@ export const PitchFlowModal: React.FC = () => {
                     )}
 
                     {needsSongSave && (
-                      <div className="p-3 rounded-lg bg-[#1f1f1f] border border-[#333] flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Heart className="w-4 h-4 text-[#BE1E2F]" />
+                          <Heart className="w-4 h-4 text-spotify-green" />
                           <div>
-                            <div className="text-xs font-mono-code text-white font-bold">
+                            <div className="text-xs font-sans text-white font-bold">
                               Save Curator Spotlight Track
                             </div>
-                            <div className="text-[10px] font-mono-code text-white/50">
+                            <div className="text-[11px] font-sans text-white/50">
                               Adds track to your Liked Songs
                             </div>
                           </div>
@@ -643,10 +673,10 @@ export const PitchFlowModal: React.FC = () => {
                               targetPlaylist.gates?.targetSongSpotifyUrl || targetPlaylist.spotifyUrl
                             )
                           }
-                          className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
                             gateSavedSong
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-[#BE1E2F] text-white hover:bg-[#a01826]'
+                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
                           }`}
                         >
                           {gateSavedSong ? (
@@ -667,7 +697,7 @@ export const PitchFlowModal: React.FC = () => {
 
               {/* Pitch Custom Note */}
               <div>
-                <label className="text-xs font-title tracking-wider text-white mb-1.5 block">
+                <label className="text-xs font-display tracking-wider text-white mb-1.5 block font-bold">
                   PITCH MESSAGE TO CURATOR (OPTIONAL)
                 </label>
                 <textarea
@@ -675,17 +705,17 @@ export const PitchFlowModal: React.FC = () => {
                   value={customMessage}
                   onChange={e => setCustomMessage(e.target.value)}
                   placeholder="Tell the curator why this track fits their playlist vibe, notable syncs/radio support, or production details..."
-                  className="w-full bg-[#1a1a1a] text-white p-3 rounded-xl border border-[#3a3a3a] text-xs font-mono-code placeholder:text-white/40 focus:outline-none focus:border-[#BE1E2F]"
+                  className="w-full bg-surface text-white p-3.5 rounded-2xl border border-white/10 text-xs font-sans placeholder:text-white/40 focus:outline-none focus:border-spotify-green"
                 />
               </div>
 
               {/* Status Message */}
               {statusMessage && (
                 <div
-                  className={`p-3 rounded-xl text-xs font-mono-code flex items-center gap-2 ${
+                  className={`p-3.5 rounded-2xl text-xs font-sans flex items-center gap-2 ${
                     statusMessage.type === 'error'
-                      ? 'bg-rose-900/30 text-rose-300 border border-rose-800'
-                      : 'bg-emerald-900/30 text-emerald-300 border border-emerald-800'
+                      ? 'bg-rose-950/40 text-rose-300 border border-rose-800'
+                      : 'bg-emerald-950/40 text-emerald-300 border border-emerald-800'
                   }`}
                 >
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -694,11 +724,11 @@ export const PitchFlowModal: React.FC = () => {
               )}
 
               {/* Bottom Actions */}
-              <div className="pt-3 border-t border-[#3a3a3a] flex items-center justify-between">
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setStep('select_track')}
-                  className="text-xs font-mono-code text-white/60 hover:text-white cursor-pointer"
+                  className="text-xs font-sans text-white/60 hover:text-white cursor-pointer"
                 >
                   ← Change Track
                 </button>
@@ -708,7 +738,7 @@ export const PitchFlowModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setBuyCreditsModalOpen(true)}
-                      className="text-xs font-mono-code text-[#BE1E2F] hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                      className="text-xs font-sans text-spotify-green hover:underline flex items-center gap-1 font-bold cursor-pointer"
                     >
                       <Coins className="w-3.5 h-3.5" /> Top up credits ({currentUser.creditBalance} available)
                     </button>
@@ -718,7 +748,7 @@ export const PitchFlowModal: React.FC = () => {
                     type="button"
                     disabled={isSubmitting || (pitchType === 'free' && !areAllGatesCompleted)}
                     onClick={handleSubmit}
-                    className="btn-sane text-xs px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-[#BE1E2F]/20"
+                    className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-spotify-green/20 transition-colors"
                   >
                     <Send className="w-3.5 h-3.5" />
                     {isSubmitting ? 'Submitting to Queue...' : `Submit Pitch (${pitchType === 'free' ? 'Free Weekly' : `${cost} Credit`})`}
@@ -730,18 +760,18 @@ export const PitchFlowModal: React.FC = () => {
 
           {step === 'success' && (
             <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto">
+              <div className="w-16 h-16 rounded-full bg-spotify-green/20 text-spotify-green border border-spotify-green/40 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <div>
-                <h3 className="text-xl font-title text-white">PITCH SUBMITTED TO CURATOR!</h3>
-                <p className="text-xs text-white/70 font-mono-code max-w-md mx-auto mt-1">
+                <h3 className="text-xl font-display font-bold text-white">PITCH SUBMITTED TO CURATOR!</h3>
+                <p className="text-xs text-white/70 font-sans max-w-md mx-auto mt-1">
                   Your track <strong>"{selectedTrack?.title}"</strong> has been queued in <strong>{targetPlaylist.curatorName}'s</strong> inbox for <strong>{targetPlaylist.title}</strong>.
                 </p>
               </div>
 
-              <div className="card-panel p-3.5 rounded-xl max-w-sm mx-auto text-left text-xs font-mono-code space-y-1">
-                <div className="text-white/50">CAMPAIGN SUMMARY:</div>
+              <div className="glass-panel p-4 rounded-2xl max-w-sm mx-auto text-left text-xs font-sans space-y-1.5 border border-white/10">
+                <div className="text-spotify-green font-bold uppercase tracking-wider text-[10px]">CAMPAIGN SUMMARY:</div>
                 <div className="text-white">● Tier: {pitchType.toUpperCase()} PITCH</div>
                 <div className="text-white">● Expected Response: ~{targetPlaylist.avgResponseHours} hours</div>
                 <div className="text-white">● Automated Email: Sent to Curator</div>
@@ -754,7 +784,7 @@ export const PitchFlowModal: React.FC = () => {
                     closePitchModal();
                     setStep('select_track');
                   }}
-                  className="btn-sane text-xs px-6 py-2 rounded-lg font-bold cursor-pointer"
+                  className="h-11 px-8 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-md shadow-spotify-green/20"
                 >
                   Done
                 </button>

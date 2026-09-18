@@ -49,7 +49,7 @@ authRouter.post('/login', (req: Request, res: Response) => {
       password,
       avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80`,
       role: 'artist',
-      bio: 'Independent artist on Submit Plug',
+      bio: 'Independent artist on Playlist Plug',
       creditBalance: 10,
       verifiedStatus: true
     });
@@ -164,7 +164,7 @@ authRouter.post('/spotify/sync', async (req: Request, res: Response) => {
 
     // Default sync verification
     const updated = db.updateUser(userId, {
-      spotifyId: user.spotifyId || `${user.name.toLowerCase().replace(/\s+/g, '_')}_spotify`,
+      spotifyId: user.spotifyId || `${(user.name || 'user').toLowerCase().replace(/\s+/g, '_')}_spotify`,
       spotifyFollowers: user.spotifyFollowers || 5400
     });
 

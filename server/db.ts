@@ -89,24 +89,6 @@ const INITIAL_TRACKS: TrackRecord[] = [
 
 const INITIAL_USERS: UserRecord[] = [
   {
-    id: 'usr_sanelow_1',
-    name: 'Sane Low Label',
-    email: 'SanelowLabel@gmail.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
-    role: 'artist',
-    spotifyId: 'sanelowlabel',
-    spotifyUri: 'spotify:user:sanelowlabel',
-    spotifyFollowers: 85400,
-    bio: 'Official Sane Low Label Hub. Direct Spotify playlist curation, organic artist pitching, and global electronic & melodic sound discovery.',
-    creditBalance: 25, // premium credits
-    freeWeeklyCredits: 2, // free weekly allowance
-    lastWeeklyReset: new Date().toISOString(),
-    verifiedStatus: true,
-    totalSubmissions: 12,
-    totalPlacements: 8,
-    createdAt: '2025-10-01T12:00:00Z'
-  },
-  {
     id: 'usr_curator_1',
     name: 'Sarah Chen (Echo Playlists)',
     email: 'sarah@echowaves.com',
@@ -141,12 +123,247 @@ const INITIAL_USERS: UserRecord[] = [
     totalSubmissions: 280,
     totalPlacements: 35,
     createdAt: '2025-08-12T14:15:00Z'
+  },
+  {
+    id: 'usr_artist_1',
+    name: 'Velvet Echoes',
+    email: 'artist@neonhorizon.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    role: 'artist',
+    spotifyId: 'velvetechoes_music',
+    spotifyUri: 'spotify:user:velvetechoes_music',
+    spotifyFollowers: 14200,
+    bio: 'Synth-pop & melodic electronica producer craft-building vintage synthesizer soundscapes.',
+    creditBalance: 15,
+    freeWeeklyCredits: 2,
+    lastWeeklyReset: new Date().toISOString(),
+    verifiedStatus: true,
+    totalSubmissions: 6,
+    totalPlacements: 4,
+    createdAt: '2025-11-01T10:00:00Z'
+  },
+  {
+    id: 'usr_sanelow_1',
+    name: 'Sane Low Label',
+    email: 'SanelowLabel@gmail.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
+    role: 'artist',
+    spotifyId: 'sanelowlabel',
+    spotifyUri: 'spotify:user:sanelowlabel',
+    spotifyFollowers: 85400,
+    bio: 'Independent record label hub for organic artist pitching and global electronic sound discovery.',
+    creditBalance: 25,
+    freeWeeklyCredits: 2,
+    lastWeeklyReset: new Date().toISOString(),
+    verifiedStatus: true,
+    totalSubmissions: 12,
+    totalPlacements: 8,
+    createdAt: '2025-10-01T12:00:00Z'
   }
 ];
 
-const INITIAL_PLAYLISTS: PlaylistRecord[] = [];
+const INITIAL_PLAYLISTS: PlaylistRecord[] = [
+  {
+    id: 'pl-synth-1',
+    title: 'Synthwave & Cyber Retrowave',
+    description: 'The premier destination for 80s inspired retro-electro, darksynth, outrun, and cyberpunk neon grooves.',
+    curatorId: 'usr_curator_1',
+    curatorName: 'Sarah Chen (Echo Playlists)',
+    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    curatorSpotifyId: 'echoplaylists_official',
+    coverArt: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
+    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM',
+    spotifyUri: 'spotify:playlist:37i9dQZF1DXdLEN7aqioXM',
+    followerCount: 48900,
+    trackCount: 82,
+    genres: ['Synthwave', 'Electronic', 'Retrowave'],
+    approvalRate: 14,
+    avgResponseHours: 18,
+    pitchCostCredits: 1,
+    freePitchEnabled: true,
+    isVerified: true,
+    isFeatured: true,
+    acceptingSubmissions: true,
+    lastActiveAt: '12m ago',
+    spotlightTrack: INITIAL_TRACKS[0],
+    gates: {
+      requireCuratorFollow: true,
+      requirePlaylistFollow: true,
+      requireSongSave: false,
+      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
+    }
+  },
+  {
+    id: 'pl-lofi-2',
+    title: 'Midnight Lo-Fi & Chill Study Beats',
+    description: 'Late night lofi hip hop, cozy jazzhop, and downtempo instrumental coffee shop vibrations for focusing.',
+    curatorId: 'usr_curator_1',
+    curatorName: 'Sarah Chen (Echo Playlists)',
+    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    curatorSpotifyId: 'echoplaylists_official',
+    coverArt: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=600&q=80',
+    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+    spotifyUri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M',
+    followerCount: 34200,
+    trackCount: 120,
+    genres: ['Lo-Fi Chill', 'Chillhop', 'Ambient'],
+    approvalRate: 18,
+    avgResponseHours: 12,
+    pitchCostCredits: 1,
+    freePitchEnabled: true,
+    isVerified: true,
+    isFeatured: true,
+    acceptingSubmissions: true,
+    lastActiveAt: '35m ago',
+    spotlightTrack: INITIAL_TRACKS[1],
+    gates: {
+      requireCuratorFollow: true,
+      requirePlaylistFollow: true,
+      requireSongSave: false,
+      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
+    }
+  },
+  {
+    id: 'pl-techno-3',
+    title: 'Berlin Melodic Techno Peak Time',
+    description: 'Underground deep driving melodic techno, hypnotic progressive beats, and peak-hour festival energy.',
+    curatorId: 'usr_curator_2',
+    curatorName: 'Marcus Brody',
+    curatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    curatorSpotifyId: 'marcus_clubradar',
+    coverArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
+    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DX6J5J286yRiO',
+    spotifyUri: 'spotify:playlist:37i9dQZF1DX6J5J286yRiO',
+    followerCount: 82500,
+    trackCount: 65,
+    genres: ['Melodic Techno', 'Techno', 'Deep House'],
+    approvalRate: 8,
+    avgResponseHours: 36,
+    pitchCostCredits: 2,
+    freePitchEnabled: false,
+    isVerified: true,
+    isFeatured: true,
+    acceptingSubmissions: true,
+    lastActiveAt: '1h ago',
+    gates: {
+      requireCuratorFollow: true,
+      requirePlaylistFollow: true,
+      requireSongSave: false,
+      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/marcus_clubradar'
+    }
+  },
+  {
+    id: 'pl-indie-4',
+    title: 'Indie & Bedroom Pop Discovery Radar',
+    description: 'Curating raw, shimmering bedroom pop, dream pop, and independent alternative indie anthems worldwide.',
+    curatorId: 'usr_curator_1',
+    curatorName: 'Sarah Chen (Echo Playlists)',
+    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    curatorSpotifyId: 'echoplaylists_official',
+    coverArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
+    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DX2Nc3B70tvx0',
+    spotifyUri: 'spotify:playlist:37i9dQZF1DX2Nc3B70tvx0',
+    followerCount: 61400,
+    trackCount: 75,
+    genres: ['Indie Rock', 'Bedroom Pop', 'Alternative'],
+    approvalRate: 20,
+    avgResponseHours: 24,
+    pitchCostCredits: 1,
+    freePitchEnabled: true,
+    isVerified: true,
+    isFeatured: false,
+    acceptingSubmissions: true,
+    lastActiveAt: '2h ago',
+    spotlightTrack: INITIAL_TRACKS[3],
+    gates: {
+      requireCuratorFollow: true,
+      requirePlaylistFollow: true,
+      requireSongSave: false,
+      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
+    }
+  },
+  {
+    id: 'pl-deephouse-5',
+    title: 'Deep House Sunset Sessions',
+    description: 'Warm organic house, sunset beach club grooves, melodic deep vibes, and afro-house selections.',
+    curatorId: 'usr_curator_2',
+    curatorName: 'Marcus Brody',
+    curatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    curatorSpotifyId: 'marcus_clubradar',
+    coverArt: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=600&q=80',
+    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXa2PvU927Am1',
+    spotifyUri: 'spotify:playlist:37i9dQZF1DXa2PvU927Am1',
+    followerCount: 27400,
+    trackCount: 94,
+    genres: ['Deep House', 'Organic House', 'Electronic'],
+    approvalRate: 16,
+    avgResponseHours: 16,
+    pitchCostCredits: 1,
+    freePitchEnabled: true,
+    isVerified: true,
+    isFeatured: false,
+    acceptingSubmissions: true,
+    lastActiveAt: '45m ago',
+    gates: {
+      requireCuratorFollow: true,
+      requirePlaylistFollow: true,
+      requireSongSave: false,
+      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/marcus_clubradar'
+    }
+  }
+];
 
-const INITIAL_SUBMISSIONS: SubmissionRecord[] = [];
+const INITIAL_SUBMISSIONS: SubmissionRecord[] = [
+  {
+    id: 'sub-1',
+    track: INITIAL_TRACKS[0],
+    playlistId: 'pl-synth-1',
+    playlistTitle: 'Synthwave & Cyber Retrowave',
+    playlistCover: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
+    curatorId: 'usr_curator_1',
+    curatorName: 'Sarah Chen (Echo Playlists)',
+    artistId: 'usr_artist_1',
+    artistName: 'Velvet Echoes',
+    artistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    pitchType: 'premium',
+    pitchCost: 1,
+    customMessage: 'Analog synthwave piece crafted with authentic Juno-106 synths and gated 80s drums. Perfect fit for your playlist!',
+    status: 'added_to_playlist',
+    feedbackTags: ['Incredible 80s vibe', 'Flawless mix', 'Spot on playlist mood'],
+    feedbackNote: 'Added to position #4! Amazing track, loving the analog hook.',
+    submittedAt: '2026-03-01T14:30:00Z',
+    reviewedAt: '2026-03-02T10:15:00Z',
+    spotifyPlacementUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM',
+    gateActionsCompleted: {
+      followedCurator: true,
+      followedPlaylist: true,
+      savedSong: true
+    }
+  },
+  {
+    id: 'sub-2',
+    track: INITIAL_TRACKS[1],
+    playlistId: 'pl-lofi-2',
+    playlistTitle: 'Midnight Lo-Fi & Chill Study Beats',
+    playlistCover: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=600&q=80',
+    curatorId: 'usr_curator_1',
+    curatorName: 'Sarah Chen (Echo Playlists)',
+    artistId: 'usr_artist_1',
+    artistName: 'Velvet Echoes',
+    artistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    pitchType: 'free',
+    pitchCost: 0,
+    customMessage: 'Calm, reflective lo-fi track with organic rain textures recorded in Tokyo.',
+    status: 'pending',
+    feedbackTags: [],
+    submittedAt: '2026-03-16T18:20:00Z',
+    gateActionsCompleted: {
+      followedCurator: true,
+      followedPlaylist: true,
+      savedSong: false
+    }
+  }
+];
 
 const INITIAL_TRANSACTIONS: TransactionRecord[] = [
   {
@@ -251,8 +468,8 @@ class DatabaseManager {
         const parsed = JSON.parse(fileContent);
         this.data = {
           users: parsed.users?.length ? parsed.users : INITIAL_USERS,
-          playlists: Array.isArray(parsed.playlists) ? parsed.playlists : INITIAL_PLAYLISTS,
-          submissions: Array.isArray(parsed.submissions) ? parsed.submissions : INITIAL_SUBMISSIONS,
+          playlists: Array.isArray(parsed.playlists) && parsed.playlists.length > 0 ? parsed.playlists : INITIAL_PLAYLISTS,
+          submissions: Array.isArray(parsed.submissions) && parsed.submissions.length > 0 ? parsed.submissions : INITIAL_SUBMISSIONS,
           transactions: Array.isArray(parsed.transactions) ? parsed.transactions : INITIAL_TRANSACTIONS,
           emails: parsed.emails || [],
           curatorActivities: Array.isArray(parsed.curatorActivities) ? parsed.curatorActivities : INITIAL_ACTIVITIES,
@@ -331,7 +548,9 @@ class DatabaseManager {
   }
 
   public getUserByEmail(email: string): UserRecord | undefined {
-    return this.data.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (!email) return undefined;
+    const target = email.toLowerCase();
+    return this.data.users.find((u) => (u.email || '').toLowerCase() === target);
   }
 
   public createUser(user: Omit<UserRecord, 'id' | 'createdAt' | 'freeWeeklyCredits' | 'lastWeeklyReset' | 'totalSubmissions' | 'totalPlacements'>): UserRecord {

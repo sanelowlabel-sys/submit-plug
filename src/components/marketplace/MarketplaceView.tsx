@@ -53,10 +53,12 @@ export const MarketplaceView: React.FC = () => {
   const filteredPlaylists = useMemo(() => {
     return playlists.filter(playlist => {
       // Search query
+      const q = (searchQuery || '').toLowerCase();
       const matchesSearch =
-        playlist.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        playlist.curatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        playlist.genres.some(g => g.toLowerCase().includes(searchQuery.toLowerCase()));
+        !q ||
+        (playlist.title || '').toLowerCase().includes(q) ||
+        (playlist.curatorName || '').toLowerCase().includes(q) ||
+        (playlist.genres || []).some(g => (g || '').toLowerCase().includes(q));
 
       // Genre
       const matchesGenre =
@@ -94,45 +96,45 @@ export const MarketplaceView: React.FC = () => {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Marketplace Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#3a3a3a]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono-code text-[#BE1E2F]">
+          <div className="flex items-center gap-2 text-xs font-sans text-spotify-green font-semibold">
             <Zap className="w-4 h-4 fill-current" />
             <span>PLAYLIST DISCOVERY & CURATION MARKETPLACE</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-title text-white mt-1">
+          <h1 className="text-2xl sm:text-4xl font-display font-bold text-white mt-1">
             EXPLORE SPOTIFY PLAYLISTS ({filteredPlaylists.length})
           </h1>
-          <p className="text-xs text-white/60 font-mono-code mt-0.5">
+          <p className="text-sm text-white/60 font-sans mt-1">
             Target high-converting playlists matching your sound profile & submit your releases.
           </p>
         </div>
 
         {/* Search Bar */}
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-white/40 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search playlist, genre, curator..."
-            className="w-full bg-[#2b2b2b] text-white pl-10 pr-4 py-2.5 rounded-xl border border-[#3a3a3a] text-xs font-mono-code placeholder:text-white/40 focus:outline-none focus:border-[#BE1E2F]"
+            className="w-full bg-surface text-white pl-11 pr-4 py-3 rounded-2xl border border-white/10 text-sm font-sans placeholder:text-white/40 focus:outline-none focus:border-spotify-green transition-colors"
           />
         </div>
       </div>
 
       {/* Genre Chips Quick Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto py-4 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto py-5 scrollbar-none">
         {allGenres.map(genre => (
           <button
             key={genre}
             onClick={() => setSelectedGenre(genre)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono-code whitespace-nowrap transition-all border ${
+            className={`px-4 py-2 rounded-xl text-xs font-display font-bold tracking-wide whitespace-nowrap transition-all border cursor-pointer ${
               selectedGenre === genre
-                ? 'bg-[#BE1E2F] text-white border-[#BE1E2F] font-bold shadow-md shadow-[#BE1E2F]/20'
-                : 'bg-[#2b2b2b] text-white/70 border-[#3a3a3a] hover:text-white hover:border-white/40'
+                ? 'bg-spotify-green text-black border-spotify-green shadow-md shadow-spotify-green/20'
+                : 'bg-surface text-white/70 border-white/10 hover:text-white hover:border-white/30'
             }`}
           >
             {genre}
@@ -141,17 +143,17 @@ export const MarketplaceView: React.FC = () => {
       </div>
 
       {/* Main Layout: Sidebar Filters + Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-2">
         {/* Mobile Filter Toggle */}
         <div className="lg:hidden">
           <button
             onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-            className="w-full card-sane py-2.5 px-4 rounded-xl flex items-center justify-between text-xs font-mono-code text-white border border-[#3a3a3a]"
+            className="w-full glass-panel py-3 px-4 rounded-2xl flex items-center justify-between text-xs font-display font-bold text-white border border-white/10 cursor-pointer"
           >
             <span className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-[#BE1E2F]" /> Filter Playlists
+              <Filter className="w-4 h-4 text-spotify-green" /> Filter Playlists
             </span>
-            <span className="text-[#BE1E2F] font-bold">{mobileFilterOpen ? 'Hide' : 'Show'}</span>
+            <span className="text-spotify-green font-bold">{mobileFilterOpen ? 'Hide' : 'Show'}</span>
           </button>
         </div>
 
@@ -161,10 +163,10 @@ export const MarketplaceView: React.FC = () => {
             mobileFilterOpen ? 'block' : 'hidden'
           } lg:block lg:col-span-1 space-y-5`}
         >
-          <div className="card-sane p-5 rounded-xl border border-[#3a3a3a] space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-[#3a3a3a]">
-              <span className="text-xs font-title font-bold tracking-wider text-white flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-[#BE1E2F]" />
+          <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <span className="text-xs font-display font-bold tracking-wider text-white flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-spotify-green" />
                 FILTER OPTIONS
               </span>
               <button
@@ -176,7 +178,7 @@ export const MarketplaceView: React.FC = () => {
                   setMaxResponseHours(72);
                   setSearchQuery('');
                 }}
-                className="text-[10px] font-mono-code text-[#BE1E2F] hover:underline"
+                className="text-xs font-sans text-spotify-green hover:underline cursor-pointer"
               >
                 Reset
               </button>
@@ -184,9 +186,9 @@ export const MarketplaceView: React.FC = () => {
 
             {/* Min Followers Slider */}
             <div>
-              <div className="flex justify-between text-xs font-mono-code mb-2">
+              <div className="flex justify-between text-xs font-sans mb-2">
                 <span className="text-white/70">Min Followers:</span>
-                <span className="text-[#BE1E2F] font-bold">
+                <span className="text-spotify-green font-bold">
                   {minFollowers > 0 ? `${(minFollowers / 1000).toFixed(0)}k+` : 'Any'}
                 </span>
               </div>
@@ -197,9 +199,9 @@ export const MarketplaceView: React.FC = () => {
                 step="5000"
                 value={minFollowers}
                 onChange={e => setMinFollowers(Number(e.target.value))}
-                className="w-full accent-[#BE1E2F] cursor-pointer"
+                className="w-full accent-spotify-green cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] font-mono-code text-white/40 mt-1">
+              <div className="flex justify-between text-[10px] font-sans text-white/40 mt-1">
                 <span>0</span>
                 <span>50k</span>
                 <span>100k+</span>
@@ -208,9 +210,9 @@ export const MarketplaceView: React.FC = () => {
 
             {/* Max Response Time Slider */}
             <div>
-              <div className="flex justify-between text-xs font-mono-code mb-2">
+              <div className="flex justify-between text-xs font-sans mb-2">
                 <span className="text-white/70">Max Response Time:</span>
-                <span className="text-amber-400 font-bold">{maxResponseHours}h</span>
+                <span className="text-spotify-green font-bold">{maxResponseHours}h</span>
               </div>
               <input
                 type="range"
@@ -219,9 +221,9 @@ export const MarketplaceView: React.FC = () => {
                 step="12"
                 value={maxResponseHours}
                 onChange={e => setMaxResponseHours(Number(e.target.value))}
-                className="w-full accent-[#BE1E2F] cursor-pointer"
+                className="w-full accent-spotify-green cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] font-mono-code text-white/40 mt-1">
+              <div className="flex justify-between text-[10px] font-sans text-white/40 mt-1">
                 <span>12h</span>
                 <span>24h</span>
                 <span>48h</span>
@@ -230,40 +232,40 @@ export const MarketplaceView: React.FC = () => {
             </div>
 
             {/* Toggles */}
-            <div className="space-y-3 pt-3 border-t border-[#3a3a3a]">
+            <div className="space-y-3 pt-3 border-t border-white/10">
               <label className="flex items-center justify-between cursor-pointer group">
-                <span className="text-xs font-mono-code text-white/80 group-hover:text-white">
+                <span className="text-xs font-sans text-white/80 group-hover:text-white">
                   Free Spotlight Pitch Only
                 </span>
                 <input
                   type="checkbox"
                   checked={onlyFreePitch}
                   onChange={e => setOnlyFreePitch(e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#BE1E2F] bg-[#1a1a1a] border-[#3a3a3a]"
+                  className="w-4 h-4 rounded accent-spotify-green bg-surface border-white/10"
                 />
               </label>
 
               <label className="flex items-center justify-between cursor-pointer group">
-                <span className="text-xs font-mono-code text-white/80 group-hover:text-white flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-[#BE1E2F]" />
+                <span className="text-xs font-sans text-white/80 group-hover:text-white flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-spotify-green" />
                   Verified Curators Only
                 </span>
                 <input
                   type="checkbox"
                   checked={onlyVerified}
                   onChange={e => setOnlyVerified(e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#BE1E2F] bg-[#1a1a1a] border-[#3a3a3a]"
+                  className="w-4 h-4 rounded accent-spotify-green bg-surface border-white/10"
                 />
               </label>
             </div>
 
             {/* Pitch Cost Explainer */}
-            <div className="bg-[#1a1a1a] p-3 rounded-lg border border-[#3a3a3a] text-[11px] font-mono-code text-white/60 space-y-1">
-              <div className="text-white font-bold flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#BE1E2F]" /> PITCH OPTIONS
+            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 text-xs font-sans text-white/60 space-y-1.5">
+              <div className="text-white font-bold flex items-center gap-1.5 font-display">
+                <Sparkles className="w-3.5 h-3.5 text-spotify-green" /> PITCH OPTIONS
               </div>
-              <div>• <strong>Free Pitch:</strong> Listen to 30s spotlight track</div>
-              <div>• <strong>Premium Pitch:</strong> 1-2 credits, 48h review guarantee</div>
+              <div>• <strong className="text-white">Free Pitch:</strong> Listen to 30s spotlight track</div>
+              <div>• <strong className="text-white">Premium Pitch:</strong> 1-2 credits, 48h review guarantee</div>
             </div>
           </div>
         </div>
@@ -271,25 +273,25 @@ export const MarketplaceView: React.FC = () => {
         {/* Playlists Grid */}
         <div className="lg:col-span-3">
           {filteredPlaylists.length === 0 ? (
-            <div className="card-sane p-12 text-center rounded-2xl border border-[#3a3a3a] space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#BE1E2F]/15 text-[#BE1E2F] flex items-center justify-center mx-auto">
+            <div className="glass-panel p-12 text-center rounded-3xl border border-white/10 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-spotify-green/15 text-spotify-green flex items-center justify-center mx-auto">
                 <Radio className="w-8 h-8" />
               </div>
               {playlists.length === 0 ? (
                 <>
-                  <h3 className="text-xl font-title font-bold text-white">
+                  <h3 className="text-xl font-display font-bold text-white">
                     REAL-TIME PLAYLIST DIRECTORY AWAITING CURATORS
                   </h3>
-                  <p className="text-xs text-white/60 font-mono-code max-w-md mx-auto leading-relaxed">
-                    Demo data has been cleared. Only authentic Spotify playlists submitted by curators in real time will appear here.
+                  <p className="text-xs text-white/60 font-sans max-w-md mx-auto leading-relaxed">
+                    Only authentic Spotify playlists submitted by curators in real time will appear here.
                   </p>
-                  <div className="pt-2">
+                  <div className="pt-3">
                     <button
                       onClick={() => {
                         switchUserRole('curator');
                         setOnboardPlaylistModalOpen(true);
                       }}
-                      className="btn-sane text-xs px-6 py-3 rounded-xl font-bold inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-[#BE1E2F]/25"
+                      className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 transition-colors"
                     >
                       <Sparkles className="w-4 h-4" /> SUBMIT PLAYLIST AS CURATOR
                     </button>
@@ -297,8 +299,8 @@ export const MarketplaceView: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <h3 className="text-lg font-title text-white">No playlists match your filters</h3>
-                  <p className="text-xs text-white/60 font-mono-code mt-1">
+                  <h3 className="text-lg font-display text-white">No playlists match your filters</h3>
+                  <p className="text-xs text-white/60 font-sans mt-1">
                     Try widening your follower filter or clearing genre tags.
                   </p>
                   <button
@@ -310,7 +312,7 @@ export const MarketplaceView: React.FC = () => {
                       setMaxResponseHours(72);
                       setSearchQuery('');
                     }}
-                    className="btn-sane text-xs px-4 py-2 rounded-lg font-bold mt-2"
+                    className="h-10 px-5 bg-spotify-green text-black font-bold rounded-xl mt-3 cursor-pointer"
                   >
                     Reset All Filters
                   </button>
@@ -318,7 +320,7 @@ export const MarketplaceView: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {filteredPlaylists.map(playlist => {
                 const isPlayingThis =
                   audioState.isPlaying &&
@@ -328,12 +330,12 @@ export const MarketplaceView: React.FC = () => {
                 return (
                   <div
                     key={playlist.id}
-                    className="card-sane p-4 rounded-xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all flex flex-col justify-between group shadow-lg"
+                    className="glass-panel p-5 rounded-2xl border border-white/10 hover:border-spotify-green/40 transition-all flex flex-col justify-between group shadow-lg"
                   >
                     <div>
                       {/* Top Bar: Cover Art + Main Meta */}
-                      <div className="flex items-start gap-3">
-                        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-[#3a3a3a] shadow-md">
+                      <div className="flex items-start gap-3.5">
+                        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-md">
                           <img
                             src={playlist.coverArt}
                             alt={playlist.title}
@@ -352,57 +354,57 @@ export const MarketplaceView: React.FC = () => {
                             }}
                             className={`absolute inset-0 flex items-center justify-center transition-all ${
                               isPlayingThis
-                                ? 'bg-[#BE1E2F]/80 text-white'
-                                : 'bg-black/40 opacity-0 group-hover:opacity-100 text-white hover:bg-black/60'
+                                ? 'bg-spotify-green/90 text-black'
+                                : 'bg-black/50 opacity-0 group-hover:opacity-100 text-white hover:bg-black/70'
                             }`}
                             title={playlist.spotlightTrack ? 'Play spotlight preview' : 'Play playlist on Spotify player'}
                           >
                             {isPlayingThis ? (
-                              <Pause className="w-6 h-6 fill-current" />
+                              <Pause className="w-7 h-7 fill-current" />
                             ) : (
-                              <Play className="w-6 h-6 fill-current ml-0.5" />
+                              <Play className="w-7 h-7 fill-current ml-0.5" />
                             )}
                           </button>
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-1">
-                            <h3 className="text-sm font-bold font-title text-white truncate leading-tight group-hover:text-[#BE1E2F] transition-colors">
+                            <h3 className="text-base font-display font-bold text-white truncate leading-tight group-hover:text-spotify-green transition-colors">
                               {playlist.title}
                             </h3>
                             {playlist.isVerified && (
                               <span
-                                className="px-1.5 py-0.5 bg-[#BE1E2F]/15 text-[#BE1E2F] rounded text-[9px] font-mono-code font-bold flex items-center gap-1 border border-[#BE1E2F]/30"
+                                className="px-2 py-0.5 bg-spotify-green/15 text-spotify-green rounded-full text-[10px] font-sans font-bold flex items-center gap-1 border border-spotify-green/30 shrink-0"
                                 title="Verified Spotify Curator"
                               >
-                                <Shield className="w-2.5 h-2.5" /> VERIFIED
+                                <Shield className="w-3 h-3" /> VERIFIED
                               </span>
                             )}
                           </div>
 
-                          <div className="text-xs text-white/70 truncate font-mono-code mt-0.5 flex items-center gap-1">
+                          <div className="text-xs text-white/70 truncate font-sans mt-0.5 flex items-center gap-1">
                             <span>by {playlist.curatorName}</span>
                           </div>
 
                           {/* Stats Grid */}
-                          <div className="grid grid-cols-3 gap-1 mt-2 bg-[#1a1a1a] p-2 rounded-lg border border-[#3a3a3a]/60 text-[10px] font-mono-code">
+                          <div className="grid grid-cols-3 gap-1.5 mt-2.5 bg-white/5 p-2 rounded-xl border border-white/10 text-[10px] font-sans">
                             <div>
-                              <div className="text-white/40">FOLLOWERS</div>
-                              <div className="font-bold text-white">
+                              <div className="text-white/40 font-medium">FOLLOWERS</div>
+                              <div className="font-bold text-white text-xs">
                                 {playlist.followerCount >= 1000
                                   ? `${(playlist.followerCount / 1000).toFixed(1)}k`
                                   : playlist.followerCount}
                               </div>
                             </div>
                             <div>
-                              <div className="text-white/40">APPROVAL</div>
-                              <div className="font-bold text-emerald-400">
+                              <div className="text-white/40 font-medium">APPROVAL</div>
+                              <div className="font-bold text-emerald-400 text-xs">
                                 {playlist.approvalRate}%
                               </div>
                             </div>
                             <div>
-                              <div className="text-white/40">RESPONDS</div>
-                              <div className="font-bold text-amber-300">
+                              <div className="text-white/40 font-medium">RESPONDS</div>
+                              <div className="font-bold text-amber-300 text-xs">
                                 ~{playlist.avgResponseHours}h
                               </div>
                             </div>
@@ -411,7 +413,7 @@ export const MarketplaceView: React.FC = () => {
                       </div>
 
                       {/* Description */}
-                      <p className="text-[11px] text-white/60 mt-3 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-white/60 mt-3 line-clamp-2 leading-relaxed font-sans">
                         {playlist.description}
                       </p>
 
@@ -420,7 +422,7 @@ export const MarketplaceView: React.FC = () => {
                         {playlist.genres.map(genre => (
                           <span
                             key={genre}
-                            className="px-2 py-0.5 rounded bg-[#1a1a1a] text-[10px] font-mono-code text-white/70 border border-[#3a3a3a]"
+                            className="px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-sans text-white/70 border border-white/10"
                           >
                             {genre}
                           </span>
@@ -429,18 +431,18 @@ export const MarketplaceView: React.FC = () => {
                     </div>
 
                     {/* Bottom Action Footer */}
-                    <div className="mt-4 pt-3 border-t border-[#3a3a3a] flex items-center justify-between">
+                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {playlist.freePitchEnabled ? (
-                          <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px] font-mono-code font-bold border border-emerald-500/30">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-sans font-bold border border-emerald-500/30">
                             FREE PITCH
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-mono-code font-bold border border-amber-500/30">
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-sans font-bold border border-amber-500/30">
                             PREMIUM ONLY
                           </span>
                         )}
-                        <span className="text-[11px] font-mono-code text-white/50">
+                        <span className="text-xs font-sans text-white/50">
                           {playlist.pitchCostCredits} Credit{playlist.pitchCostCredits > 1 ? 's' : ''}
                         </span>
                       </div>
@@ -450,14 +452,14 @@ export const MarketplaceView: React.FC = () => {
                           href={playlist.spotifyUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg bg-[#1a1a1a] border border-[#3a3a3a] text-white/60 hover:text-white hover:border-[#BE1E2F] transition-colors"
+                          className="p-2 rounded-xl bg-surface border border-white/10 text-white/60 hover:text-white hover:border-spotify-green/50 transition-colors"
                           title="Open in Spotify"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <ExternalLink className="w-4 h-4" />
                         </a>
                         <button
                           onClick={() => openPitchModal(playlist)}
-                          className="btn-sane text-xs px-4 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shadow-md shadow-[#BE1E2F]/20 cursor-pointer"
+                          className="px-4 py-2 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-spotify-green/20 cursor-pointer transition-colors text-xs font-display"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           PITCH SONG

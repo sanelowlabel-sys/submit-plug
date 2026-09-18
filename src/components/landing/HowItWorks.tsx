@@ -11,14 +11,14 @@ export const HowItWorks: React.FC = () => {
       num: '01',
       title: 'SELECT PLAYLISTS',
       desc: 'Browse real-time, genre-specific Spotify playlists uploaded by verified curators and filtered by followers and SLA response times.',
-      icon: <Radio className="w-6 h-6 text-[#BE1E2F]" />,
+      icon: <Radio className="w-6 h-6 text-spotify-green" />,
       badge: 'Real-Time Discovery'
     },
     {
       num: '02',
       title: 'CHOOSE PITCH TYPE',
       desc: 'Submit for FREE via curator social gates, or use curator-selected credits (1-10 CR) for Guaranteed 48-Hour Review and detailed feedback.',
-      icon: <Sparkles className="w-6 h-6 text-[#BE1E2F]" />,
+      icon: <Sparkles className="w-6 h-6 text-spotify-green" />,
       badge: 'Free or Premium'
     },
     {
@@ -34,15 +34,15 @@ export const HowItWorks: React.FC = () => {
     {
       num: '01',
       title: 'CONNECT SPOTIFY PLAYLIST',
-      desc: 'Onboard your playlists with 1-click Spotify OAuth. Submit Plug automatically fetches follower counts, track counts, and genres.',
-      icon: <Headphones className="w-6 h-6 text-[#BE1E2F]" />,
+      desc: 'Onboard your playlists with 1-click Spotify OAuth. Playlist Plug automatically fetches follower counts, track counts, and genres.',
+      icon: <Headphones className="w-6 h-6 text-spotify-green" />,
       badge: 'Instant Sync'
     },
     {
       num: '02',
       title: 'LISTEN & REVIEW IN STUDIO DECK',
       desc: 'Stream high-res 30-sec track previews with built-in waveform player. 1-click Approve adds track directly to your Spotify playlist.',
-      icon: <Clock className="w-6 h-6 text-[#BE1E2F]" />,
+      icon: <Clock className="w-6 h-6 text-spotify-green" />,
       badge: 'Streamlined DAW Deck'
     },
     {
@@ -55,27 +55,32 @@ export const HowItWorks: React.FC = () => {
   ];
 
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8 border-t border-[#3a3a3a] bg-[#1a1a1a]">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-white/5 bg-[#121212] relative overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2b2b2b] text-[11px] font-mono-code text-[#BE1E2F] border border-[#3a3a3a] mb-3">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            STREAMLINED WORKFLOW
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          {/* Glowing Status Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-spotify-green font-medium mb-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotify-green opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-spotify-green"></span>
+            </span>
+            <span className="font-sans">Streamlined Workflow</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-title tracking-tight text-white">
-            HOW SUBMIT PLUG WORKS
+
+          <h2 className="text-3xl sm:text-5xl font-display font-bold tracking-tight text-white">
+            HOW PLAYLIST PLUG WORKS
           </h2>
-          <p className="text-sm text-white/60 font-sans mt-2">
+          <p className="text-base text-white/60 font-sans mt-3 max-w-xl mx-auto">
             A transparent, organic submission pipeline engineered for independent creators and professional tastemakers.
           </p>
 
           {/* Toggle Switch */}
-          <div className="inline-flex p-1 rounded-xl bg-[#2b2b2b] border border-[#3a3a3a] mt-6">
+          <div className="inline-flex p-1.5 rounded-2xl bg-surface border border-white/10 mt-8">
             <button
               onClick={() => setActiveTab('artist')}
-              className={`px-5 py-2 rounded-lg text-xs font-title tracking-wider transition-all flex items-center gap-2 ${
+              className={`px-6 py-2.5 rounded-xl text-xs font-display font-bold tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'artist'
-                  ? 'bg-[#BE1E2F] text-white shadow-md shadow-[#BE1E2F]/30'
+                  ? 'bg-spotify-green text-black shadow-lg shadow-spotify-green/20'
                   : 'text-white/60 hover:text-white'
               }`}
             >
@@ -84,9 +89,9 @@ export const HowItWorks: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('curator')}
-              className={`px-5 py-2 rounded-lg text-xs font-title tracking-wider transition-all flex items-center gap-2 ${
+              className={`px-6 py-2.5 rounded-xl text-xs font-display font-bold tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'curator'
-                  ? 'bg-[#BE1E2F] text-white shadow-md shadow-[#BE1E2F]/30'
+                  ? 'bg-spotify-green text-black shadow-lg shadow-spotify-green/20'
                   : 'text-white/60 hover:text-white'
               }`}
             >
@@ -96,52 +101,55 @@ export const HowItWorks: React.FC = () => {
           </div>
         </div>
 
-        {/* Steps Grid */}
+        {/* Steps Grid with Glass Cards Pattern */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {(activeTab === 'artist' ? artistSteps : curatorSteps).map((step, idx) => (
             <div
               key={step.num}
-              className="card-sane p-6 rounded-xl border border-[#3a3a3a] hover:border-[#BE1E2F] transition-all flex flex-col justify-between relative group"
+              className="glass-panel rounded-3xl p-8 relative overflow-hidden border border-white/10 hover:border-spotify-green/40 transition-all flex flex-col justify-between group"
             >
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#1a1a1a] border border-[#3a3a3a] flex items-center justify-center group-hover:border-[#BE1E2F] transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-spotify-green/40 group-hover:bg-spotify-green/10 transition-colors">
                     {step.icon}
                   </div>
-                  <span className="font-title text-2xl font-bold text-white/20 group-hover:text-[#BE1E2F] transition-colors">
+                  <span className="font-display text-3xl font-bold text-white/20 group-hover:text-spotify-green transition-colors">
                     {step.num}
                   </span>
                 </div>
 
-                <div className="inline-block px-2.5 py-0.5 rounded bg-[#1a1a1a] text-[10px] font-mono-code text-[#BE1E2F] border border-[#3a3a3a] mb-2 font-bold">
+                <div className="inline-block px-3 py-1 rounded-full bg-white/5 text-xs font-sans text-spotify-green border border-white/10 mb-3 font-semibold">
                   {step.badge}
                 </div>
 
-                <h3 className="text-lg font-title tracking-wide text-white mb-2">
+                <h3 className="text-xl font-display font-bold text-white mb-2 tracking-tight">
                   {step.title}
                 </h3>
 
-                <p className="text-xs text-white/70 leading-relaxed font-sans">
+                <p className="text-sm text-white/70 leading-relaxed font-sans">
                   {step.desc}
                 </p>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-[#3a3a3a]/60 text-[11px] font-mono-code text-white/40 flex items-center justify-between">
+              <div className="mt-8 pt-4 border-t border-white/10 text-xs font-sans text-white/40 flex items-center justify-between">
                 <span>Step {idx + 1} of 3</span>
-                <span className="text-white/60 group-hover:text-[#BE1E2F] transition-colors">Active Pipeline →</span>
+                <span className="text-white/60 group-hover:text-spotify-green transition-colors font-medium">
+                  Active Pipeline →
+                </span>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Bottom CTA for Active Tab */}
-        <div className="mt-10 text-center">
+        {/* Bottom CTA for Active Tab - Primary CTA Button Pattern */}
+        <div className="mt-12 text-center">
           {activeTab === 'artist' ? (
             <button
               onClick={() => openPitchModal()}
-              className="btn-sane px-8 py-3.5 rounded-xl text-sm font-bold shadow-xl shadow-[#BE1E2F]/20 cursor-pointer"
+              className="h-14 px-8 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors mx-auto cursor-pointer shadow-xl shadow-spotify-green/20"
             >
-              START PITCHING YOUR TRACK NOW
+              <Sparkles className="w-5 h-5 text-black" />
+              <span>START PITCHING YOUR TRACK NOW</span>
             </button>
           ) : (
             <button
@@ -149,9 +157,10 @@ export const HowItWorks: React.FC = () => {
                 switchUserRole('curator');
                 setOnboardPlaylistModalOpen(true);
               }}
-              className="btn-sane px-8 py-3.5 rounded-xl text-sm font-bold shadow-xl shadow-[#BE1E2F]/20 cursor-pointer"
+              className="h-14 px-8 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors mx-auto cursor-pointer shadow-xl shadow-spotify-green/20"
             >
-              CONNECT SPOTIFY PLAYLIST TO REVIEW QUEUE
+              <Radio className="w-5 h-5 text-black" />
+              <span>CONNECT SPOTIFY PLAYLIST TO REVIEW QUEUE</span>
             </button>
           )}
         </div>

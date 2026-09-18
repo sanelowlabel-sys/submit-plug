@@ -20,7 +20,15 @@ import {
 import { globalAudioEngine } from '../utils/audioEngine';
 import { fetchSpotifyMetadata, convertSpotifyMetadataToTrack, parseSpotifyUrl } from '../utils/spotifyParser';
 import confetti from 'canvas-confetti';
-import { supabase } from '../lib/supabase';
+import {
+  supabase,
+  supabaseSignIn,
+  supabaseSignUp,
+  supabaseSignOut,
+  supabaseResetPassword,
+  subscribeToRealtimeSubmissions,
+  isSupabaseConfigured
+} from '../lib/supabase';
 
 export interface AudioState {
   currentTrack: Track | null;
@@ -43,6 +51,7 @@ interface AppContextType {
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, role: UserRole, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
   authModalMode: 'login' | 'register';
@@ -68,18 +77,12 @@ interface AppContextType {
   submissions: Submission[];
   artistSubmissions: Submission[];
   curatorInboxSubmissions: Submission[];
-  submitPitch: (data: {
-    track: Track;
-    playlistId: string;
-    pitchType: PitchType;
-    customMessage?: string;
-    spotlightDuration?: number;
-    gateActionsCompleted?: {
-      followedCurator?: boolean;
-      followedPlaylist?: boolean;
-      savedSong?: boolean;
-    };
-  }) => Promise<{ success: boolean; message: string }>;
+  submitPitch: (
+    arg1: any,
+    arg2?: string,
+    arg3?: PitchType,
+    arg4?: string
+  ) => Promise<{ success: boolean; message: string; submission?: Submission; error?: string }>;
   reviewSubmission: (
     submissionId: string,
     action: 'approve' | 'decline',
@@ -132,6 +135,10 @@ interface AppContextType {
   openPitchModal: (playlist?: Playlist) => void;
   closePitchModal: () => void;
 
+  spotifyWizardOpen: boolean;
+  setSpotifyWizardOpen: (open: boolean) => void;
+  openSpotifyWizard: (playlist?: Playlist) => void;
+
   buyCreditsModalOpen: boolean;
   setBuyCreditsModalOpen: (open: boolean) => void;
 
@@ -177,26 +184,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // User state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     // Check if user explicitly logged out previously
-    if (typeof window !== 'undefined' && localStorage.getItem('submitplug_logged_out') === 'true') {
-      return null;
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('submitplug_logged_out') === 'true') {
+        return null;
+      }
+      const savedUser = localStorage.getItem('submitplug_current_user');
+      if (savedUser) {
+        try {
+          return JSON.parse(savedUser);
+        } catch {}
+      }
     }
-    return {
-      id: 'usr_sanelow_1',
-      name: 'Sane Low Label',
-      email: 'SanelowLabel@gmail.com',
-      avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
-      role: 'artist',
-      spotifyId: 'sanelowlabel',
-      spotifyUri: 'https://open.spotify.com/user/sanelowlabel',
-      spotifyFollowers: 85400,
-      bio: 'Official Sane Low Label Hub. Direct Spotify playlist curation, organic artist pitching, and global sound discovery.',
-      creditBalance: 25,
-      freeWeeklyCredits: 2,
-      verifiedStatus: true,
-      totalSubmissions: 12,
-      totalPlacements: 8,
-      createdAt: new Date().toISOString()
-    };
+    return null; // Clean guest state by default
   });
 
   const isAuthenticated = Boolean(currentUser);
@@ -216,8 +215,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Modals state
   const [pitchModalOpen, setPitchModalOpen] = useState(false);
   const [selectedPlaylistForPitch, setSelectedPlaylistForPitch] = useState<Playlist | null>(null);
+  const [spotifyWizardOpen, setSpotifyWizardOpen] = useState(false);
   const [buyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
   const [onboardPlaylistModalOpen, setOnboardPlaylistModalOpen] = useState(false);
+
+  const openSpotifyWizard = (playlist?: Playlist) => {
+    if (playlist) {
+      setSelectedPlaylistForPitch(playlist);
+    }
+    setSpotifyWizardOpen(true);
+  };
 
   // Real-time ticker
   const [liveActiveCuratorsCount, setLiveActiveCuratorsCount] = useState(48);
@@ -291,12 +298,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // 1. Initial Load from Backend API
   const fetchAllInitialData = useCallback(async () => {
     try {
-      // User Profile & Wallet
-      const userRes = await fetch('/api/auth/me');
+      // User Profile & Wallet with token if available
+      const token = typeof window !== 'undefined' ? localStorage.getItem('submitplug_token') : null;
+      const userRes = await fetch('/api/auth/me', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (userRes.ok) {
         const userData = await userRes.json();
         if (userData.user) {
           setCurrentUser(userData.user);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('submitplug_current_user', JSON.stringify(userData.user));
+          }
+        } else if (!token) {
+          setCurrentUser(null);
         }
       }
 
@@ -306,6 +321,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const plData = await plRes.json();
         if (plData.playlists) {
           setPlaylists(plData.playlists);
+        }
+      }
+
+      // Tracks Catalog
+      const trkRes = await fetch('/api/tracks');
+      if (trkRes.ok) {
+        const trkData = await trkRes.json();
+        if (trkData.tracks && trkData.tracks.length > 0) {
+          setArtistTracks(trkData.tracks);
         }
       }
 
@@ -566,6 +590,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCuratorActivities(prev => [payload, ...prev.slice(0, 49)]);
     }
 
+    if (type === 'TRACK_ADDED' && payload) {
+      setArtistTracks(prev => {
+        const exists = prev.some(t => t.id === payload.id);
+        if (exists) return prev;
+        return [payload, ...prev];
+      });
+    }
+
     if (type === 'PLAYLIST_CREATED' && payload) {
       setPlaylists(prev => {
         const exists = prev.some(p => p.id === payload.id);
@@ -590,9 +622,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Auth Functions
+  // Supabase Realtime Subscription for Submissions Table
+  useEffect(() => {
+    const subChannel = subscribeToRealtimeSubmissions({
+      onInsert: (newSub) => {
+        setSubmissions(prev => {
+          if (prev.some(s => s.id === newSub.id)) return prev;
+          return [newSub, ...prev];
+        });
+        showToast(
+          '⚡ Realtime Pitch Received',
+          `"${newSub.track.title}" pitched to "${newSub.playlistTitle}"`,
+          'info'
+        );
+      },
+      onUpdate: (updatedSub) => {
+        setSubmissions(prev => prev.map(s => (s.id === updatedSub.id ? updatedSub : s)));
+        if (updatedSub.status === 'approved' || updatedSub.status === 'added_to_playlist') {
+          showToast(
+            '🚀 Placement Approved (Supabase Realtime)!',
+            `"${updatedSub.track.title}" was approved on "${updatedSub.playlistTitle}"!`,
+            'success'
+          );
+          try {
+            confetti({ particleCount: 80, spread: 60, origin: { y: 0.5 } });
+          } catch {}
+        }
+      },
+      onDelete: (id) => {
+        setSubmissions(prev => prev.filter(s => s.id !== id));
+      }
+    });
+
+    return () => {
+      subChannel.unsubscribe();
+    };
+  }, [showToast]);
+
+  // Auth Functions with Supabase Auth Integration
   const login = async (email: string, password = 'password123'): Promise<{ success: boolean; error?: string }> => {
     try {
+      // 1. Supabase Auth attempt
+      const sbResult = await supabaseSignIn(email, password);
+      if (!sbResult.success && isSupabaseConfigured) {
+        return { success: false, error: sbResult.error };
+      }
+
+      // 2. Synchronize session with backend API
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -605,6 +681,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCurrentUser(data.user);
       setActiveRole(data.user.role || 'artist');
       if (typeof window !== 'undefined') {
+        localStorage.setItem('submitplug_current_user', JSON.stringify(data.user));
         localStorage.setItem('submitplug_token', data.token || `token_${data.user.id}`);
         localStorage.setItem('submitplug_user_id', data.user.id);
         localStorage.removeItem('submitplug_logged_out');
@@ -617,7 +694,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       showToast(
         'Signed In Successfully',
-        `Welcome back, ${data.user.name}! Real-time sessions are live.`,
+        `Welcome back, ${data.user.name}! Supabase Auth session active.`,
         'success'
       );
 
@@ -629,6 +706,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const register = async (name: string, email: string, role: UserRole, password = 'password123'): Promise<{ success: boolean; error?: string }> => {
     try {
+      // 1. Supabase Auth registration
+      const sbResult = await supabaseSignUp(name, email, password, role);
+      if (!sbResult.success && isSupabaseConfigured) {
+        return { success: false, error: sbResult.error };
+      }
+
+      // 2. Synchronize profile with backend API
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -641,6 +725,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCurrentUser(data.user);
       setActiveRole(role);
       if (typeof window !== 'undefined') {
+        localStorage.setItem('submitplug_current_user', JSON.stringify(data.user));
         localStorage.setItem('submitplug_token', data.token || `token_${data.user.id}`);
         localStorage.setItem('submitplug_user_id', data.user.id);
         localStorage.removeItem('submitplug_logged_out');
@@ -653,7 +738,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       showToast(
         'Account Registered!',
-        `Welcome to Submit Plug, ${data.user.name}! Your account is active.`,
+        `Welcome to Playlist Plug, ${data.user.name}! Supabase user account created.`,
         'success'
       );
 
@@ -664,19 +749,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = async () => {
+    await supabaseSignOut();
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('submitplug_current_user');
       localStorage.removeItem('submitplug_token');
       localStorage.removeItem('submitplug_user_id');
       localStorage.setItem('submitplug_logged_out', 'true');
     }
     setCurrentUser(null);
-    showToast('Signed Out', 'You have been safely signed out of your account.', 'info');
-    if (activeTab === 'curator' || activeTab === 'profile') {
+    showToast('Signed Out', 'You have been safely signed out.', 'info');
+    if (activeTab === 'curator' || activeTab === 'profile' || activeTab === 'dashboard') {
       setActiveTab('home');
     }
+  };
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
+    return await supabaseResetPassword(email);
   };
 
   // Switch role helper
@@ -712,29 +803,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Submit pitch via real API
-  const submitPitch = async (data: {
-    track: Track;
-    playlistId: string;
-    pitchType: PitchType;
-    customMessage?: string;
-    spotlightDuration?: number;
-    gateActionsCompleted?: {
-      followedCurator?: boolean;
-      followedPlaylist?: boolean;
-      savedSong?: boolean;
-    };
-  }): Promise<{ success: boolean; message: string }> => {
+  const submitPitch = async (
+    arg1: any,
+    arg2?: string,
+    arg3?: PitchType,
+    arg4?: string
+  ): Promise<{ success: boolean; message: string; submission?: Submission; error?: string }> => {
     if (!currentUser) {
       openLoginModal();
       return { success: false, message: 'Please sign in to pitch your music.' };
     }
 
-    const targetPlaylist = playlists.find(p => p.id === data.playlistId);
+    let track: Track;
+    let playlistId: string;
+    let pitchType: PitchType;
+    let customMessage: string | undefined;
+    let gateActionsCompleted: any;
+
+    if (arg1 && typeof arg1 === 'object' && 'track' in arg1) {
+      track = arg1.track;
+      playlistId = arg1.playlistId;
+      pitchType = arg1.pitchType || 'premium';
+      customMessage = arg1.customMessage;
+      gateActionsCompleted = arg1.gateActionsCompleted;
+    } else {
+      track = arg1;
+      playlistId = arg2!;
+      pitchType = arg3 || 'premium';
+      customMessage = arg4;
+    }
+
+    const targetPlaylist = playlists.find(p => p.id === playlistId);
     if (!targetPlaylist) {
       return { success: false, message: 'Target playlist not found' };
     }
 
-    const isFree = data.pitchType === 'free';
+    const isFree = pitchType === 'free';
     const cost = isFree ? 0 : (targetPlaylist.pitchCostCredits || 1);
 
     if (isFree && (currentUser.freeWeeklyCredits || 0) < 1) {
@@ -753,11 +857,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           artistId: currentUser.id,
-          playlistId: data.playlistId,
-          track: data.track,
-          pitchType: data.pitchType,
-          customMessage: data.customMessage,
-          gateActionsCompleted: data.gateActionsCompleted || {
+          playlistId: playlistId,
+          track: track,
+          pitchType: pitchType,
+          customMessage: customMessage,
+          gateActionsCompleted: gateActionsCompleted || {
             followedCurator: true,
             followedPlaylist: true,
             savedSong: false
@@ -768,7 +872,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const resData = await response.json();
 
       if (!response.ok) {
-        return { success: false, message: resData.error || 'Submission failed' };
+        return { success: false, message: resData.error || 'Submission failed', error: resData.error };
       }
 
       // Update local wallet directly from server response
@@ -802,10 +906,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       return {
         success: true,
-        message: `Successfully pitched "${data.track.title}" to ${targetPlaylist.title}! Curator notified in real-time.`
+        message: `Successfully pitched "${track.title}" to ${targetPlaylist.title}! Curator notified in real-time.`,
+        submission: resData.submission
       };
     } catch (err: any) {
-      return { success: false, message: err.message || 'Network error submitting pitch' };
+      return { success: false, message: err.message || 'Network error submitting pitch', error: err.message };
     }
   };
 
@@ -896,7 +1001,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Connect Spotify OAuth (Popup Flow adhering to OAuth Skill)
   const connectSpotifyOAuth = async () => {
-    const targetUserId = currentUser?.id || 'usr_sanelow_1';
+    if (!currentUser) {
+      openLoginModal();
+      return;
+    }
+    const targetUserId = currentUser.id;
     try {
       const res = await fetch(`/api/auth/spotify/url?userId=${targetUserId}`);
       const data = await res.json();
@@ -1196,7 +1305,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedPlaylistForPitch(null);
   };
 
-  const addArtistTrack = (trackData: Omit<Track, 'id'>) => {
+  const addArtistTrack = async (trackData: Omit<Track, 'id'>) => {
+    try {
+      const res = await fetch('/api/tracks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trackData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.track) {
+          setArtistTracks(prev => [data.track, ...prev]);
+          showToast('Track Saved', `"${data.track.title}" is ready for pitching.`, 'success');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Track saving error:', err);
+    }
     const newTrack: Track = {
       ...trackData,
       id: `trk_${Date.now()}`,
@@ -1227,7 +1353,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const userPlaylists = playlists.filter(p => currentUser && p.curatorId === currentUser.id);
   const artistSubmissions = submissions.filter(s => currentUser && s.artistId === currentUser.id);
-  const curatorInboxSubmissions = submissions.filter(s => currentUser && (s.curatorId === currentUser.id || s.curatorId === 'usr_curator_1'));
+  const curatorInboxSubmissions = submissions.filter(s => currentUser && s.curatorId === currentUser.id);
   const unreadNotificationCount = currentUser ? notifications.filter(n => !n.read && n.userId === currentUser.id).length : 0;
 
   return (
@@ -1238,6 +1364,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         login,
         register,
         logout,
+        resetPassword,
         authModalOpen,
         setAuthModalOpen,
         authModalMode,
@@ -1288,6 +1415,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         selectedPlaylistForPitch,
         openPitchModal,
         closePitchModal,
+        spotifyWizardOpen,
+        setSpotifyWizardOpen,
+        openSpotifyWizard,
         buyCreditsModalOpen,
         setBuyCreditsModalOpen,
         onboardPlaylistModalOpen,

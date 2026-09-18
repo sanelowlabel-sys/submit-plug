@@ -1,92 +1,146 @@
 @import "tailwindcss";
 
-:root {
-  --sane-red: #BE1E2F;
-  --sane-red-hover: #e02438;
-  --sane-grey: #2b2b2b;      /* cards */
-  --sane-grey-2: #1a1a1a;    /* page + panels */
-  --sane-grey-3: #3a3a3a;    /* borders */
-  --sane-grey-4: #4a4a4a;
-  --sane-text: #ffffff;
-  --sane-text-muted: rgba(255, 255, 255, 0.65); /* optional dimmer copy */
+@theme {
+  --color-spotify-green: #1DB954;
+  --color-spotify-green-hover: #1ed760;
+  --color-surface: #181818;
+  --color-surface-hover: #282828;
+  
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
 }
 
 body {
-  font-family: 'Exo', sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  color: var(--sane-text);
-  background: var(--sane-grey-2);
+  background-color: #121212;
+  color: #ffffff;
 }
 
-h1, h2, h3, h4, .title, .font-title {
-  font-family: 'Hammersmith One', sans-serif;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #fff;
+h1, h2, h3, h4, h5, h6, .font-title, .title {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 .font-mono-code {
   font-family: 'DM Mono', monospace;
 }
 
+/* Reusable Glass Effect */
+.glass-panel {
+  background: rgba(24, 24, 24, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Core Dark Surfaces & Cards */
 .card-sane {
-  background: var(--sane-grey);
-  border: 1px solid var(--sane-grey-3);
-  border-radius: 12px;
+  background: rgba(24, 24, 24, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.card-sane:hover {
+  border-color: rgba(29, 185, 84, 0.35);
 }
 
 .card-panel {
-  background: var(--sane-grey-2);
-  border: 1px solid var(--sane-grey-3);
-  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
 }
 
+/* Buttons */
 .btn-sane {
-  font-family: 'Hammersmith One', sans-serif;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #fff;
-  background: var(--sane-red);
-  border: 2px solid var(--sane-red);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #000000;
+  background-color: var(--color-spotify-green);
+  border-radius: 1rem;
   transition: all 0.2s ease-in-out;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
 }
 
 .btn-sane:hover {
-  background: #fff;
-  color: var(--sane-red);
-  border-color: #fff;
+  background-color: var(--color-spotify-green-hover);
+  color: #000000;
+  transform: translateY(-1px);
 }
 
 .btn-sane-outline {
-  font-family: 'Hammersmith One', sans-serif;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: #ffffff;
   background: transparent;
-  border: 2px solid var(--sane-grey-3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 1rem;
   transition: all 0.2s ease-in-out;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
 }
 
 .btn-sane-outline:hover {
-  border-color: var(--sane-red);
-  color: var(--sane-red);
-  background: rgba(190, 30, 47, 0.08);
+  border-color: var(--color-spotify-green);
+  color: var(--color-spotify-green);
+  background: rgba(29, 185, 84, 0.08);
+}
+
+/* Primary CTA */
+.btn-cta {
+  height: 3.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  background-color: var(--color-spotify-green);
+  color: #000000;
+  font-family: var(--font-display);
+  font-weight: 700;
+  border-radius: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.btn-cta:hover {
+  background-color: var(--color-spotify-green-hover);
+  transform: translateY(-1px);
+}
+
+/* Dark Input */
+.input-dark {
+  width: 100%;
+  height: 3.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  background-color: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  color: #ffffff;
+  transition: all 0.2s ease;
+}
+.input-dark:focus {
+  outline: none;
+  border-color: rgba(29, 185, 84, 0.5);
+  box-shadow: 0 0 0 1px rgba(29, 185, 84, 0.5);
+}
+.input-dark::placeholder {
+  color: #6b7280;
 }
 
 a.sane-link {
-  color: var(--sane-red);
+  color: var(--color-spotify-green);
   transition: color 0.15s ease;
 }
 
 a.sane-link:hover {
-  color: #fff;
+  color: var(--color-spotify-green-hover);
 }
 
 /* Custom Scrollbar for Audio Wave & Inbox */
@@ -95,14 +149,14 @@ a.sane-link:hover {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #121212;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: #282828;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #BE1E2F;
+  background: var(--color-spotify-green);
 }
 
 /* Pulse badge animation */

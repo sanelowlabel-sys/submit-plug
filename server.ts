@@ -13,6 +13,7 @@ import { activityRouter } from './server/routes/activity';
 import { emailsRouter } from './server/routes/emails';
 import { supabaseRouter } from './server/routes/supabase';
 import { spotifyRouter } from './server/routes/spotify';
+import { tracksRouter } from './server/routes/tracks';
 import { realtime } from './server/websocket';
 import { exchangeSpotifyCode, fetchSpotifyProfile } from './server/spotify';
 import { db } from './server/db';
@@ -51,6 +52,7 @@ async function startServer() {
   app.use('/api/emails', emailsRouter);
   app.use('/api/supabase', supabaseRouter);
   app.use('/api/spotify', spotifyRouter);
+  app.use('/api/tracks', tracksRouter);
 
   // Spotify OAuth Callback handler (Popup Flow)
   app.get(['/auth/callback', '/auth/callback/'], async (req: Request, res: Response) => {

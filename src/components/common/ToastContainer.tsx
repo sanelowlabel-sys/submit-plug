@@ -31,25 +31,25 @@ export const ToastContainer: React.FC = () => {
           <div
             key={toast.id}
             id={`toast-${toast.id}`}
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border shadow-2xl backdrop-blur-md transition-all duration-300 animate-slideUp ${
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 animate-slideUp ${
               isSuccess
-                ? 'bg-[#141d17]/95 border-emerald-500/40 text-emerald-100 shadow-emerald-950/30'
+                ? 'bg-surface/95 border-spotify-green/40 text-emerald-100 shadow-emerald-950/30'
                 : isError
-                ? 'bg-[#211416]/95 border-[#BE1E2F]/60 text-red-100 shadow-red-950/30'
+                ? 'bg-surface/95 border-rose-500/50 text-rose-100 shadow-rose-950/30'
                 : isWarning
-                ? 'bg-[#241d13]/95 border-amber-500/40 text-amber-100 shadow-amber-950/30'
-                : 'bg-[#181818]/95 border-[#383838] text-white shadow-black/50'
+                ? 'bg-surface/95 border-amber-500/40 text-amber-100 shadow-amber-950/30'
+                : 'bg-surface/95 border-white/10 text-white shadow-black/50'
             }`}
           >
             <div className="mt-0.5 flex-shrink-0">
-              {isSuccess && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-              {isError && <AlertCircle className="w-4 h-4 text-[#BE1E2F]" />}
+              {isSuccess && <CheckCircle2 className="w-4 h-4 text-spotify-green" />}
+              {isError && <AlertCircle className="w-4 h-4 text-rose-400" />}
               {isWarning && <AlertCircle className="w-4 h-4 text-amber-400" />}
-              {!isSuccess && !isError && !isWarning && <Sparkles className="w-4 h-4 text-[#BE1E2F]" />}
+              {!isSuccess && !isError && !isWarning && <Sparkles className="w-4 h-4 text-spotify-green" />}
             </div>
 
             <div className="flex-1 min-w-0 pr-1">
-              <div className="text-xs font-title font-bold tracking-wide leading-tight">
+              <div className="text-xs font-display font-bold tracking-wide leading-tight">
                 {toast.title}
               </div>
               <div className="text-[11px] opacity-80 mt-0.5 leading-snug break-words font-sans">

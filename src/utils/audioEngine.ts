@@ -1,5 +1,5 @@
 /**
- * Submit Plug Web Audio & Preview Synthesizer Engine
+ * Playlist Plug Web Audio & Preview Synthesizer Engine
  * Provides fallback synth playback for music tracks and spotlight preview listeners
  */
 
