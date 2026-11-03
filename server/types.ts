@@ -61,7 +61,7 @@ export interface PlaylistRecord {
   followerCount: number;
   trackCount: number;
   genres: string[];
-  approvalRate: number;
+  approvalRate: number | null;
   avgResponseHours: number;
   pitchCostCredits: number;
   freePitchEnabled: boolean;

@@ -1,6 +1,8 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { db } from '../db';
-import { realtime } from '../websocket';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { standardApiLimiter, sensitiveActionLimiter } from '../middleware/rateLimit';
+import { validateSubmissionInput, sanitizeText } from '../middleware/validation';
 import {
   sendEmailNotification,
   generateCuratorSubmissionEmailHtml,
@@ -9,230 +11,177 @@ import {
 
 export const submissionsRouter = Router();
 
-// Get submissions list
-submissionsRouter.get('/', (req: Request, res: Response) => {
-  const { artistId, curatorId, status, playlistId } = req.query;
-  let list = db.getSubmissions();
+submissionsRouter.use(standardApiLimiter);
 
-  if (artistId) {
-    list = list.filter((s) => s.artistId === artistId);
-  }
-  if (curatorId) {
-    list = list.filter((s) => s.curatorId === curatorId);
-  }
-  if (status) {
-    list = list.filter((s) => s.status === status);
-  }
-  if (playlistId) {
-    list = list.filter((s) => s.playlistId === playlistId);
+/**
+ * GET /api/submissions
+ * RLS: Artists see only their own submissions. Curators see submissions to their playlists.
+ * User ID is strictly taken from the verified token.
+ */
+submissionsRouter.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
-  res.json({ submissions: list, count: list.length });
-});
-
-// Submit pitch
-submissionsRouter.post('/', async (req: Request, res: Response) => {
-  const {
-    artistId,
-    playlistId,
-    track,
-    pitchType,
-    customMessage,
-    gateActionsCompleted
-  } = req.body;
-
-  if (!artistId || !playlistId || !track) {
-    return res.status(400).json({ error: 'artistId, playlistId, and track are required' });
-  }
-
-  const artist = db.getUserById(artistId);
-  if (!artist) {
-    return res.status(404).json({ error: 'Artist user not found' });
-  }
-
-  const playlist = db.getPlaylistById(playlistId);
-  if (!playlist) {
-    return res.status(404).json({ error: 'Playlist not found' });
-  }
-
-  // Determine cost
-  const isFree = pitchType === 'free';
-  const pitchCost = isFree ? 0 : (playlist.pitchCostCredits || 1);
-
-  // Validate credits
-  if (isFree) {
-    if ((artist.freeWeeklyCredits || 0) < 1) {
-      return res.status(400).json({
-        error: 'You have used your free weekly pitch allowance. Top up credits or wait for your weekly reset.'
-      });
-    }
-    // Deduct free credit
-    db.updateUser(artist.id, {
-      freeWeeklyCredits: Math.max(0, (artist.freeWeeklyCredits || 0) - 1)
-    });
-  } else {
-    if ((artist.creditBalance || 0) < pitchCost) {
-      return res.status(400).json({
-        error: `Insufficient credits. You need ${pitchCost} credits to submit a premium pitch.`
-      });
-    }
-    // Deduct premium credits
-    db.updateUser(artist.id, {
-      creditBalance: Math.max(0, (artist.creditBalance || 0) - pitchCost)
-    });
-  }
-
-  // Create submission record
-  const submission = db.createSubmission({
-    track,
-    playlistId: playlist.id,
-    playlistTitle: playlist.title,
-    playlistCover: playlist.coverArt,
-    curatorId: playlist.curatorId,
-    curatorName: playlist.curatorName,
-    artistId: artist.id,
-    artistName: artist.name,
-    artistAvatar: artist.avatarUrl,
-    pitchType: isFree ? 'free' : 'premium',
-    pitchCost,
-    customMessage: customMessage || '',
-    status: 'pending',
-    feedbackTags: [],
-    gateActionsCompleted: gateActionsCompleted || {
-      followedCurator: true,
-      followedPlaylist: true,
-      savedSong: false
-    }
-  });
-
-  // Log transaction
-  const tx = db.addTransaction({
-    userId: artist.id,
-    userName: artist.name,
-    amount: -pitchCost,
-    type: isFree ? 'free_pitch' : 'premium_pitch',
-    description: `Submitted "${track.title}" to ${playlist.title}`,
-    status: 'completed'
-  });
-
-  // Fetch updated artist wallet
-  const refreshedArtist = db.getUserById(artist.id);
-
-  // Real-time WebSocket broadcasts
-  realtime.broadcastSubmission('created', submission);
-  if (refreshedArtist) {
-    realtime.broadcastWallet(artist.id, {
-      creditBalance: refreshedArtist.creditBalance,
-      freeWeeklyCredits: refreshedArtist.freeWeeklyCredits,
-      transaction: tx
-    });
-  }
-
-  // Send automated HTML email to curator
   try {
-    const curatorUser = db.getUserById(playlist.curatorId);
-    const curatorEmail = curatorUser?.email || `${playlist.curatorSpotifyId}@curator.spotify.com`;
-    const emailHtml = generateCuratorSubmissionEmailHtml(submission, playlist);
+    const { status, playlistId, roleView } = req.query;
 
-    await sendEmailNotification({
-      to: curatorEmail,
-      subject: `🎵 New Submission: "${track.title}" submitted to "${playlist.title}"`,
-      template: 'new_submission_curator',
-      recipientRole: 'curator',
-      trackTitle: track.title,
-      playlistTitle: playlist.title,
-      curatorName: playlist.curatorName,
-      artistName: artist.name,
-      html: emailHtml
-    });
-  } catch (err) {
-    console.error('[Submissions] Failed to dispatch curator submission email:', err);
-  }
-
-  res.status(201).json({
-    success: true,
-    submission,
-    wallet: {
-      creditBalance: refreshedArtist?.creditBalance,
-      freeWeeklyCredits: refreshedArtist?.freeWeeklyCredits
+    let list;
+    if (req.user.role === 'admin') {
+      list = await db.getSubmissions({
+        status: status ? String(status) : undefined,
+        playlistId: playlistId ? String(playlistId) : undefined
+      });
+    } else if (req.user.role === 'curator' || roleView === 'curator') {
+      list = await db.getSubmissions({
+        curatorId: req.user.id,
+        status: status ? String(status) : undefined,
+        playlistId: playlistId ? String(playlistId) : undefined
+      });
+    } else {
+      // Default to artist view: artist sees their own submissions
+      list = await db.getSubmissions({
+        artistId: req.user.id,
+        status: status ? String(status) : undefined,
+        playlistId: playlistId ? String(playlistId) : undefined
+      });
     }
-  });
+
+    res.json({ submissions: list, count: list.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch submissions' });
+  }
 });
 
-// Review submission (Curator action: Approve / Decline)
-submissionsRouter.post('/:id/review', async (req: Request, res: Response) => {
-  const { action, feedbackTags, feedbackNote, spotifyPlacementUrl } = req.body;
-  const submissionId = req.params.id;
-
-  if (!action || (action !== 'approve' && action !== 'decline')) {
-    return res.status(400).json({ error: 'Action must be "approve" or "decline"' });
+/**
+ * POST /api/submissions
+ * Submit track pitch.
+ * Phase 3 requirement: SPENDING CREDITS ON A PITCH MUST HAPPEN IN THE SAME TRANSACTION AS CREATING THE SUBMISSION.
+ * Artist ID is taken STRICTLY from req.user.id (verified token).
+ */
+submissionsRouter.post('/', requireAuth, sensitiveActionLimiter, validateSubmissionInput, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const submission = db.getSubmissionById(submissionId);
+  const { playlistId, track, pitchType, customMessage } = req.body;
+
+  try {
+    // Atomic spend and submission creation in database engine
+    const { submission, newBalance } = await db.spendCreditsAndCreateSubmission({
+      artistId: req.user.id, // Strictly from verified JWT
+      playlistId,
+      track,
+      pitchType: pitchType === 'free' ? 'free' : 'premium',
+      customMessage: sanitizeText(customMessage, 500)
+    });
+
+    // Send asynchronous transactional email notification to curator
+    const playlist = await db.getPlaylistById(playlistId);
+    if (playlist) {
+      const curatorUser = await db.getUserProfile(playlist.curatorId);
+      if (curatorUser?.email) {
+        sendEmailNotification({
+          to: curatorUser.email,
+          subject: `New Pitch: "${track.title}" submitted to "${playlist.title}"`,
+          template: 'new_submission_curator',
+          trackTitle: track.title,
+          playlistTitle: playlist.title,
+          curatorName: playlist.curatorName,
+          artistName: req.user.name,
+          html: generateCuratorSubmissionEmailHtml(
+            track.title,
+            req.user.name,
+            playlist.title,
+            pitchType,
+            customMessage
+          )
+        }).catch(err => console.warn('[Email] Curator notification dispatch error:', err));
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Submission successfully sent to curator review queue.',
+      submission,
+      newBalance
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to submit pitch' });
+  }
+});
+
+/**
+ * POST /api/submissions/:id/review
+ * Review submission (approve or decline).
+ * Phase 2 requirement: ONLY A PLAYLIST'S OWNER CAN REVIEW ITS SUBMISSIONS.
+ */
+submissionsRouter.post('/:id/review', requireAuth, sensitiveActionLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { decision, feedbackTags, feedbackNote, spotifyPlacementUrl } = req.body;
+
+  if (decision !== 'approve' && decision !== 'decline') {
+    return res.status(400).json({ error: 'Decision must be "approve" or "decline".' });
+  }
+
+  const submission = await db.getSubmissionById(req.params.id);
   if (!submission) {
     return res.status(404).json({ error: 'Submission not found' });
   }
 
-  const newStatus = action === 'approve' ? 'approved' : 'declined';
-  const reviewedAt = new Date().toISOString();
-
-  const updated = db.updateSubmission(submissionId, {
-    status: newStatus,
-    feedbackTags: feedbackTags || [],
-    feedbackNote: feedbackNote || '',
-    reviewedAt,
-    ...(spotifyPlacementUrl ? { spotifyPlacementUrl } : {})
-  });
-
-  if (!updated) {
-    return res.status(500).json({ error: 'Failed to update submission' });
+  // Fetch playlist to check ownership
+  const playlist = await db.getPlaylistById(submission.playlistId);
+  if (!playlist) {
+    return res.status(404).json({ error: 'Associated playlist not found' });
   }
 
-  // Record curator activity
-  const curatorActivity = db.addCuratorActivity({
-    curatorId: submission.curatorId,
-    curatorName: submission.curatorName,
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    action: action === 'approve' ? 'approved' : 'reviewed',
-    playlistTitle: submission.playlistTitle,
-    trackTitle: submission.track.title,
-    timestamp: 'Just now'
+  // Enforce security rule: ONLY playlist owner (curatorId === req.user.id) or admin can review!
+  if (playlist.curatorId !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Forbidden: only the verified playlist owner can review submissions for this playlist.'
+    });
+  }
+
+  const sanitizedTags = Array.isArray(feedbackTags) ? feedbackTags.map(t => sanitizeText(t, 50)) : [];
+  const sanitizedNote = sanitizeText(feedbackNote, 1000);
+
+  const updated = await db.reviewSubmission({
+    submissionId: submission.id,
+    decision,
+    feedbackTags: sanitizedTags,
+    feedbackNote: sanitizedNote,
+    spotifyPlacementUrl: spotifyPlacementUrl ? String(spotifyPlacementUrl).trim() : undefined
   });
 
-  // Real-time WebSocket broadcasts
-  realtime.broadcastSubmission('updated', updated);
-  realtime.broadcastCuratorActivity(curatorActivity);
-
-  // Send automated HTML email to artist
-  try {
-    const artistUser = db.getUserById(submission.artistId);
-    const artistEmail = artistUser?.email || 'artist@playlistplug.com';
-    const emailHtml = generateArtistDecisionEmailHtml(
-      updated,
-      action,
-      feedbackTags || [],
-      feedbackNote
-    );
-
-    await sendEmailNotification({
-      to: artistEmail,
-      subject: action === 'approve'
-        ? `🎉 Approved! "${submission.track.title}" added to ${submission.playlistTitle}`
-        : `Decision Update: "${submission.track.title}" on ${submission.playlistTitle}`,
-      template: action === 'approve' ? 'submission_approved_artist' : 'submission_declined_artist',
-      recipientRole: 'artist',
+  // Send transactional email to artist
+  const artist = await db.getUserProfile(submission.artistId);
+  if (artist?.email) {
+    sendEmailNotification({
+      to: artist.email,
+      subject: decision === 'approve'
+        ? `Accepted! "${submission.track.title}" added to "${submission.playlistTitle}"`
+        : `Curator Feedback on "${submission.track.title}" for "${submission.playlistTitle}"`,
+      template: decision === 'approve' ? 'submission_approved_artist' : 'submission_declined_artist',
       trackTitle: submission.track.title,
       playlistTitle: submission.playlistTitle,
-      curatorName: submission.curatorName,
-      artistName: submission.artistName,
-      html: emailHtml
-    });
-  } catch (err) {
-    console.error('[Submissions] Failed to dispatch artist decision email:', err);
+      curatorName: req.user.name,
+      artistName: artist.name,
+      html: generateArtistDecisionEmailHtml(
+        submission.track.title,
+        submission.playlistTitle,
+        decision === 'approve' ? 'approved' : 'declined',
+        sanitizedNote,
+        spotifyPlacementUrl
+      )
+    }).catch(err => console.warn('[Email] Artist notification dispatch error:', err));
   }
 
   res.json({
     success: true,
+    message: decision === 'approve' ? 'Submission approved.' : 'Submission declined with curator feedback.',
     submission: updated
   });
 });

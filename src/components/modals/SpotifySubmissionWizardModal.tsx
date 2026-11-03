@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { parseSpotifyUrl, isSpotifyUrl, fetchSpotifyMetadata } from '../../utils/spotifyParser';
-import { supabase, isSupabaseConfigured, mapSubmissionToSupabaseRow } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface SpotifySubmissionWizardModalProps {
   isOpen?: boolean;
@@ -280,15 +280,6 @@ export const SpotifySubmissionWizardModal: React.FC<SpotifySubmissionWizardModal
       if (result.success && result.submission) {
         setSubmittedSubmission(result.submission);
 
-        // Also sync directly to Supabase table if configured
-        if (isSupabaseConfigured) {
-          try {
-            const row = mapSubmissionToSupabaseRow(result.submission);
-            await supabase.from('submissions').upsert(row);
-          } catch (sbErr) {
-            console.warn('[Supabase Wizard] Direct sync warning:', sbErr);
-          }
-        }
 
         try {
           confetti({

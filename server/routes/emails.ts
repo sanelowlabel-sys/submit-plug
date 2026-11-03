@@ -4,25 +4,32 @@ import { db } from '../db';
 export const emailsRouter = Router();
 
 // Get dispatched email logs
-emailsRouter.get('/', (req: Request, res: Response) => {
-  const { recipientRole, to } = req.query;
-  let list = db.getEmails();
+emailsRouter.get('/', async (req: Request, res: Response) => {
+  try {
+    const { recipient, to } = req.query;
+    let list = await db.getEmails();
 
-  if (recipientRole) {
-    list = list.filter((e) => e.recipientRole === recipientRole);
-  }
-  if (to) {
-    list = list.filter((e) => e.to.toLowerCase() === String(to).toLowerCase());
-  }
+    const target = recipient || to;
+    if (target) {
+      list = list.filter((e) => e.recipient.toLowerCase() === String(target).toLowerCase());
+    }
 
-  res.json({ emails: list, count: list.length });
+    res.json({ emails: list, count: list.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch email logs' });
+  }
 });
 
 // Get specific email HTML
-emailsRouter.get('/:id', (req: Request, res: Response) => {
-  const email = db.getEmails().find((e) => e.id === req.params.id);
-  if (!email) {
-    return res.status(404).json({ error: 'Email log not found' });
+emailsRouter.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const emails = await db.getEmails();
+    const email = emails.find((e) => e.id === req.params.id);
+    if (!email) {
+      return res.status(404).json({ error: 'Email log not found' });
+    }
+    res.json({ email });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch email log' });
   }
-  res.json({ email });
 });

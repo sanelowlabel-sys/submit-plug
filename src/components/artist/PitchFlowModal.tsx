@@ -63,11 +63,6 @@ export const PitchFlowModal: React.FC = () => {
   const [spotlightElapsedSec, setSpotlightElapsedSec] = useState(0);
   const SPOTLIGHT_REQUIRED_SEC = 30;
 
-  // Curator Follower Gates interactive state
-  const [gateFollowedCurator, setGateFollowedCurator] = useState(false);
-  const [gateFollowedPlaylist, setGateFollowedPlaylist] = useState(false);
-  const [gateSavedSong, setGateSavedSong] = useState(false);
-
   // Custom Spotify URL input for new track
   const [customUrlInput, setCustomUrlInput] = useState('');
   const [showAddCustomTrack, setShowAddCustomTrack] = useState(false);
@@ -97,12 +92,7 @@ export const PitchFlowModal: React.FC = () => {
     pitchCostCredits: 1,
     freePitchEnabled: true,
     avgResponseHours: 24,
-    coverArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false
-    }
+    coverArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'
   };
 
   // Sync spotlight listening progress with global footer audio player
@@ -116,9 +106,6 @@ export const PitchFlowModal: React.FC = () => {
       setSpotlightListening(true);
       const current = Math.min(SPOTLIGHT_REQUIRED_SEC, Math.floor(audioState.currentTime));
       setSpotlightElapsedSec(current);
-      if (audioState.currentTime >= SPOTLIGHT_REQUIRED_SEC) {
-        setGateSavedSong(true);
-      }
     } else if (audioState.currentTrack?.id === targetPlaylist.spotlightTrack?.id && !audioState.isPlaying) {
       setSpotlightListening(false);
     }
@@ -128,17 +115,6 @@ export const PitchFlowModal: React.FC = () => {
 
   const cost = pitchType === 'premium' ? (targetPlaylist.pitchCostCredits || 1) : 0;
   const hasEnoughCredits = (currentUser?.creditBalance ?? 0) >= cost;
-  const isFreeSpotlightComplete = spotlightElapsedSec >= SPOTLIGHT_REQUIRED_SEC;
-
-  // Gate check for free pitches
-  const needsCuratorFollow = targetPlaylist.gates?.requireCuratorFollow ?? true;
-  const needsPlaylistFollow = targetPlaylist.gates?.requirePlaylistFollow ?? true;
-  const needsSongSave = targetPlaylist.gates?.requireSongSave ?? false;
-
-  const areAllGatesCompleted =
-    (!needsCuratorFollow || gateFollowedCurator) &&
-    (!needsPlaylistFollow || gateFollowedPlaylist) &&
-    (!needsSongSave || gateSavedSong);
 
   // Spotlight Listen Engine (routes through Global Footer Player)
   const startSpotlightListen = () => {
@@ -150,17 +126,6 @@ export const PitchFlowModal: React.FC = () => {
   const pauseSpotlightListen = () => {
     pauseTrack();
     setSpotlightListening(false);
-  };
-
-  const handlePerformGate = async (actionType: 'curator_follow' | 'playlist_follow' | 'song_save', url: string) => {
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-    await verifyGateAction(targetPlaylist.id, actionType);
-
-    if (actionType === 'curator_follow') setGateFollowedCurator(true);
-    if (actionType === 'playlist_follow') setGateFollowedPlaylist(true);
-    if (actionType === 'song_save') setGateSavedSong(true);
   };
 
   const handleAddTrackFromSpotify = async (e: React.FormEvent) => {
@@ -228,13 +193,6 @@ export const PitchFlowModal: React.FC = () => {
         });
         return;
       }
-      if (!areAllGatesCompleted) {
-        setStatusMessage({
-          type: 'error',
-          text: 'Please complete all curator follower gate requirements below before submitting.'
-        });
-        return;
-      }
     }
 
     if (pitchType === 'premium' && !hasEnoughCredits) {
@@ -250,12 +208,7 @@ export const PitchFlowModal: React.FC = () => {
       playlistId: targetPlaylist.id,
       pitchType,
       customMessage: customMessage.trim() || undefined,
-      spotlightDuration: pitchType === 'free' ? spotlightElapsedSec : undefined,
-      gateActionsCompleted: {
-        followedCurator: gateFollowedCurator,
-        followedPlaylist: gateFollowedPlaylist,
-        savedSong: gateSavedSong
-      }
+      spotlightDuration: pitchType === 'free' ? spotlightElapsedSec : undefined
     });
 
     setIsSubmitting(false);
@@ -550,148 +503,26 @@ export const PitchFlowModal: React.FC = () => {
                       </span>
                       <div className="text-xs font-bold font-sans text-emerald-400">0 Credits</div>
                     </div>
-                    <div className="text-sm font-bold font-display text-white">FREE GATE PITCH</div>
+                    <div className="text-sm font-bold font-display text-white">FREE WEEKLY PITCH</div>
                     <ul className="text-xs text-white/70 font-sans mt-2 space-y-1">
-                      <li>• Complete Curator Follower Gates</li>
-                      <li>• 2 Free Weekly Pitches per user</li>
-                      <li>• Standard Curator Queue</li>
+                      <li>• Consumes 1 of your 2 free weekly credits</li>
+                      <li>• Standard curator listening queue</li>
+                      <li>• Resets automatically every 7 days</li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              {/* CURATOR FOLLOWER GATES (IF FREE PITCH) */}
+              {/* COMPLIANT FREE PITCH GUIDANCE */}
               {pitchType === 'free' && (
-                <div className="glass-panel p-4 rounded-2xl border border-white/10 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold font-display text-white flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      COMPLETE CURATOR FOLLOWER GATES
-                    </span>
-                    <span className="text-[11px] font-sans text-white/50">
-                      Supports Curator Playlist Growth
-                    </span>
+                <div className="glass-panel p-4 rounded-2xl border border-white/10 space-y-2 bg-black/40">
+                  <div className="flex items-center gap-2 text-xs font-bold font-display text-spotify-green">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>ORGANIC DISCOVERY & ANTI-PAYOLA COMPLIANCE</span>
                   </div>
-
-                  <div className="space-y-2">
-                    {needsCuratorFollow && (
-                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <UserPlus className="w-4 h-4 text-spotify-green" />
-                          <div>
-                            <div className="text-xs font-sans text-white font-bold">
-                              Follow {targetPlaylist.curatorName}
-                            </div>
-                            <div className="text-[11px] font-sans text-white/50">
-                              Official Curator Spotify Account
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handlePerformGate(
-                              'curator_follow',
-                              targetPlaylist.gates?.curatorSpotifyProfileUrl || 'https://open.spotify.com'
-                            )
-                          }
-                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                            gateFollowedCurator
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
-                          }`}
-                        >
-                          {gateFollowedCurator ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Followed
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="w-3 h-3" /> Follow on Spotify
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-
-                    {needsPlaylistFollow && (
-                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Radio className="w-4 h-4 text-spotify-green" />
-                          <div>
-                            <div className="text-xs font-sans text-white font-bold">
-                              Follow "{targetPlaylist.title}"
-                            </div>
-                            <div className="text-[11px] font-sans text-white/50">
-                              Saves playlist to your Spotify library
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handlePerformGate('playlist_follow', targetPlaylist.spotifyUrl)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                            gateFollowedPlaylist
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
-                          }`}
-                        >
-                          {gateFollowedPlaylist ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Followed
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="w-3 h-3" /> Follow Playlist
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-
-                    {needsSongSave && (
-                      <div className="p-3 rounded-xl bg-surface border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Heart className="w-4 h-4 text-spotify-green" />
-                          <div>
-                            <div className="text-xs font-sans text-white font-bold">
-                              Save Curator Spotlight Track
-                            </div>
-                            <div className="text-[11px] font-sans text-white/50">
-                              Adds track to your Liked Songs
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handlePerformGate(
-                              'song_save',
-                              targetPlaylist.gates?.targetSongSpotifyUrl || targetPlaylist.spotifyUrl
-                            )
-                          }
-                          className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                            gateSavedSong
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-spotify-green text-black hover:bg-spotify-green-hover'
-                          }`}
-                        >
-                          {gateSavedSong ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Saved
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="w-3 h-3 fill-current" /> Save Song
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs text-white/60 font-sans leading-relaxed">
+                    Free weekly pitches connect you directly with {targetPlaylist.curatorName}. Curators review tracks purely based on sonic alignment and playlist curation quality.
+                  </p>
                 </div>
               )}
 
@@ -746,7 +577,7 @@ export const PitchFlowModal: React.FC = () => {
 
                   <button
                     type="button"
-                    disabled={isSubmitting || (pitchType === 'free' && !areAllGatesCompleted)}
+                    disabled={isSubmitting || (pitchType === 'free' && freeWeeklyCredits < 1)}
                     onClick={handleSubmit}
                     className="h-12 px-6 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-2xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-spotify-green/20 transition-colors"
                   >

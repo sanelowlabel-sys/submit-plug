@@ -78,14 +78,14 @@ export const UserDashboard: React.FC = () => {
     const declined = userSubmissions.filter((s) => s.status === 'declined').length;
 
     const resolved = approved + declined;
-    const approvalRate = resolved > 0 ? Math.round((approved / resolved) * 100) : 75;
+    const approvalRate = resolved > 0 ? Math.round((approved / resolved) * 100) : null;
 
     // Calculate reach: Sum follower count of approved playlists
     const reachedFollowers = userSubmissions
       .filter((s) => s.status === 'approved' || s.status === 'added_to_playlist')
       .reduce((acc, sub) => {
         const pl = playlists.find((p) => p.id === sub.playlistId);
-        return acc + (pl ? pl.followerCount : 15000);
+        return acc + (pl ? pl.followerCount : 0);
       }, 0);
 
     return {
@@ -94,7 +94,7 @@ export const UserDashboard: React.FC = () => {
       approved,
       declined,
       approvalRate,
-      reachCount: reachedFollowers || 84500
+      reachCount: reachedFollowers || 0
     };
   }, [userSubmissions, playlists]);
 
@@ -292,13 +292,13 @@ export const UserDashboard: React.FC = () => {
             </div>
           </div>
           <div className="text-3xl font-bold font-display text-white mb-1">
-            {metrics.approvalRate}%
+            {metrics.approvalRate !== null ? `${metrics.approvalRate}%` : 'New'}
           </div>
           {/* Progress bar */}
           <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden mb-1">
             <div
               className="bg-spotify-green h-full rounded-full transition-all duration-500"
-              style={{ width: `${metrics.approvalRate}%` }}
+              style={{ width: `${metrics.approvalRate ?? 0}%` }}
             />
           </div>
           <div className="text-[11px] text-spotify-green font-sans">

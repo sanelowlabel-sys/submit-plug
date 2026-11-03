@@ -1,37 +1,32 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { db } from '../db';
-import { realtime } from '../websocket';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { standardApiLimiter } from '../middleware/rateLimit';
 
 export const walletRouter = Router();
 
-walletRouter.get('/', (req: Request, res: Response) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+walletRouter.use(standardApiLimiter);
 
-  db.checkWeeklyCreditsReset();
-
-  const user = userId ? db.getUserById(userId) : db.getUsers()[0];
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+/**
+ * GET /api/wallet
+ * Returns current user's balance and ledger transactions.
+ * Strictly uses req.user.id from verified JWT token.
+ */
+walletRouter.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const transactions = db.getTransactions(user.id);
+  try {
+    const profile = await db.getUserProfile(req.user.id);
+    const transactions = await db.getTransactionsForUser(req.user.id);
 
-  // Compute next weekly reset date (7 days after lastWeeklyReset)
-  const lastReset = user.lastWeeklyReset ? new Date(user.lastWeeklyReset) : new Date();
-  const nextReset = new Date(lastReset.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  res.json({
-    userId: user.id,
-    creditBalance: user.creditBalance || 0,
-    freeWeeklyCredits: user.freeWeeklyCredits || 0,
-    lastWeeklyReset: user.lastWeeklyReset,
-    nextWeeklyReset: nextReset.toISOString(),
-    transactions
-  });
-});
-
-walletRouter.get('/transactions', (req: Request, res: Response) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
-  const transactions = db.getTransactions(userId);
-  res.json({ transactions });
+    res.json({
+      creditBalance: profile?.creditBalance || 0,
+      freeWeeklyCredits: profile?.freeWeeklyCredits ?? 2,
+      transactions
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch wallet' });
+  }
 });

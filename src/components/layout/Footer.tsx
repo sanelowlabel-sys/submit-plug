@@ -18,7 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
 
 export const Footer: React.FC = () => {
-  const { setActiveTab, switchUserRole, openPitchModal, setOnboardPlaylistModalOpen } = useApp();
+  const { setActiveTab, switchUserRole, openPitchModal, setOnboardPlaylistModalOpen, openLegalModal } = useApp();
 
   return (
     <footer className="bg-[#0e0e0e] border-t border-white/10 text-white/80 pt-16 pb-28 sm:pb-32 px-4 sm:px-6 lg:px-8 mt-24 relative overflow-hidden">
@@ -75,14 +75,14 @@ export const Footer: React.FC = () => {
             <p className="text-xs text-white/60 leading-relaxed font-sans">
               Next-generation direct-to-curator gateway connecting independent producers, record labels, and tastemakers with verified Spotify editorial audiences.
             </p>
-            <div className="pt-2 flex flex-col gap-1.5 text-xs font-sans text-white/40">
+            <div className="pt-2 flex flex-col gap-1.5 text-xs font-sans text-white/50">
               <div className="flex items-center gap-2">
-                <Server className="w-3.5 h-3.5 text-spotify-green" />
-                <span>Node Cluster: Live • Ingress: 3000</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-spotify-green" />
+                <span>Verified Curator Ecosystem</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-spotify-green" />
-                <span>Spotify Web API v1: Operational</span>
+                <span>Spotify Web Standards Compliant</span>
               </div>
             </div>
           </div>
@@ -228,24 +228,26 @@ export const Footer: React.FC = () => {
             <span className="hidden lg:inline text-white/40">Global Spotify Curator & Artist Network</span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 text-xs font-sans">
-            <span className="text-spotify-green flex items-center gap-1.5 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-spotify-green animate-pulse" />
-              <span>Real-Time Sync Active</span>
-            </span>
-            <span>•</span>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3.5 text-xs font-sans">
             <button
-              onClick={() => setActiveTab('home')}
+              onClick={() => openLegalModal('terms')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Home
+              Terms of Service
             </button>
             <span>•</span>
             <button
-              onClick={() => setActiveTab('marketplace')}
+              onClick={() => openLegalModal('privacy')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Explore
+              Privacy Policy
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => openLegalModal('refund')}
+              className="hover:text-white transition-colors cursor-pointer text-emerald-400 font-semibold"
+            >
+              48h Refund Policy
             </button>
             <span>•</span>
             <button

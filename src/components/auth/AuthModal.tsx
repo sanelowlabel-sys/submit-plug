@@ -104,6 +104,9 @@ export const AuthModal: React.FC = () => {
         const res = await register(name.trim(), email.trim(), role, password);
         if (!res.success) {
           setErrorMsg(res.error || 'Failed to create account. Please try again.');
+        } else if (res.requiresEmailConfirmation) {
+          setSuccessMsg('Account registered! An email confirmation link has been sent. Please confirm your email before signing in.');
+          setActiveForm('login');
         }
       } else if (activeForm === 'forgot_password') {
         if (!email.trim()) {
@@ -121,24 +124,6 @@ export const AuthModal: React.FC = () => {
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleQuickDemoFill = async (demoEmail: string, demoPassword = 'password123', demoRole: UserRole = 'artist') => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setRole(demoRole);
-    setErrorMsg(null);
-    setIsLoading(true);
-    try {
-      const res = await login(demoEmail, demoPassword);
-      if (!res.success) {
-        setErrorMsg(res.error || 'Demo sign-in failed');
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Quick login error');
     } finally {
       setIsLoading(false);
     }
@@ -328,31 +313,6 @@ export const AuthModal: React.FC = () => {
                 </>
               )}
             </button>
-
-            {/* Quick Demo Credentials for Reviewers */}
-            <div className="pt-3 border-t border-white/10">
-              <div className="text-[10px] text-white/40 font-mono text-center uppercase tracking-wider mb-2">
-                Fast-Access Demo Accounts
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill('artist@submitplug.com', 'password123', 'artist')}
-                  className="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Music2 className="w-3.5 h-3.5 text-spotify-green" />
-                  <span>Artist Demo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill('curator@submitplug.com', 'password123', 'curator')}
-                  className="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-white/70 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Radio className="w-3.5 h-3.5 text-spotify-green" />
-                  <span>Curator Demo</span>
-                </button>
-              </div>
-            </div>
           </form>
         )}
 

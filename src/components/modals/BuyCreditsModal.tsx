@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
-import { X, Coins, CheckCircle2, Zap, Lock, ShieldCheck, ExternalLink } from 'lucide-react';
+import { X, Coins, CheckCircle2, Zap, Lock, ShieldCheck, AlertCircle, ExternalLink } from 'lucide-react';
 
 export interface BuyCreditPackage {
   id: string;
@@ -24,7 +24,7 @@ export const PLATFORM_PACKAGES: BuyCreditPackage[] = [
       '20 Premium Guaranteed Reviews',
       'Detailed Feedback Tags & Notes',
       'Placement Status Live Tracking',
-      'Free Weekly Allowance Resets Unlocked'
+      '48-Hour SLA Guarantee'
     ]
   },
   {
@@ -36,9 +36,9 @@ export const PLATFORM_PACKAGES: BuyCreditPackage[] = [
     perCredit: '$0.20/credit',
     features: [
       '50 Premium Guaranteed Reviews',
-      'Priority Curator Inbox Queue (24-48h)',
-      'Direct Spotify Editorial Placements',
-      'Full Email Dispatch Delivery Receipts'
+      'Priority Curator Inbox Queue',
+      'Full Email Dispatch Delivery Receipts',
+      '48-Hour SLA Guarantee'
     ]
   },
   {
@@ -46,22 +46,22 @@ export const PLATFORM_PACKAGES: BuyCreditPackage[] = [
     name: 'Label & Campaign',
     credits: 100,
     priceUsd: 19.99,
-    perCredit: '$0.19/credit',
+    perCredit: '$0.20/credit',
     features: [
       '100 Premium Guaranteed Reviews',
-      'Best Value ($0.19 per submission)',
       'Multi-Playlist Track Campaign Push',
-      'Curator Direct Feedback Guarantee'
+      'Curator Direct Feedback Guarantee',
+      '48-Hour SLA Guarantee'
     ]
   }
 ];
 
 export const BuyCreditsModal: React.FC = () => {
-  const { buyCreditsModalOpen, setBuyCreditsModalOpen, purchaseCredits, currentUser } = useApp();
+  const { buyCreditsModalOpen, setBuyCreditsModalOpen, purchaseCredits, currentUser, showToast } = useApp();
   const [selectedPkgId, setSelectedPkgId] = useState<string>(PLATFORM_PACKAGES[1].id);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [paypalOrderId, setPaypalOrderId] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [paypalApproveUrl, setPaypalApproveUrl] = useState<string | null>(null);
 
   if (!buyCreditsModalOpen) return null;
 
@@ -69,196 +69,160 @@ export const BuyCreditsModal: React.FC = () => {
 
   const handlePayPalCheckout = async () => {
     setIsProcessing(true);
-    try {
-      // Direct call to PayPal checkout
-      const res = await fetch('/api/payments/paypal/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packageId: selectedPkg.id,
-          userId: currentUser.id
-        })
-      });
+    setErrorMessage(null);
+    setPaypalApproveUrl(null);
 
-      const orderData = await res.json();
-      const orderId = orderData.orderId || `PAYID-${Date.now()}`;
-      setPaypalOrderId(orderId);
+    const result = await purchaseCredits(selectedPkg.id);
 
-      // Complete capture and credit
-      const ok = await purchaseCredits(selectedPkg.id, selectedPkg.credits, selectedPkg.priceUsd, 'paypal');
-
-      if (ok) {
-        setSuccess(true);
-        setTimeout(() => {
-          setSuccess(false);
-          setBuyCreditsModalOpen(false);
-        }, 2200);
-      }
-    } catch (err) {
-      console.error('[PayPal Checkout] Error:', err);
-    } finally {
-      setIsProcessing(false);
+    if (result.success && result.approveUrl) {
+      setPaypalApproveUrl(result.approveUrl);
+      // Attempt to open in a new tab for seamless PayPal payment
+      window.open(result.approveUrl, '_blank', 'noopener,noreferrer');
+      showToast('PayPal Window Opened', 'Please complete payment in the PayPal tab.', 'info');
+    } else if (!result.success) {
+      setErrorMessage(result.error || 'Failed to initialize PayPal order. Check server configuration.');
     }
+
+    setIsProcessing(false);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden bg-surface">
-        {/* Header with Brand Logo */}
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-surface-hover">
-          <div className="flex items-center gap-3">
-            <BrandLogo size={36} withBadge={false} alt="Brand Logo" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-display font-bold text-white tracking-wide">TOP UP SUBMISSION CREDITS</h3>
-                <span className="px-2 py-0.5 rounded-full bg-[#0070BA]/20 border border-[#0070BA]/40 text-[#0070BA] text-[9px] font-sans font-bold uppercase">
-                  PayPal Protected
-                </span>
-              </div>
-              <div className="text-[11px] font-sans text-white/50">
-                Guaranteed Curator Reviews & PayPal Buyer Protection
-              </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div
+        className="glass-panel w-full max-w-xl rounded-3xl border border-white/10 shadow-2xl p-6 sm:p-8 relative overflow-hidden bg-surface/95"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Glow backlight */}
+        <div className="absolute top-0 right-0 w-60 h-60 bg-spotify-green/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+        <button
+          onClick={() => setBuyCreditsModalOpen(false)}
+          className="absolute top-4 right-4 text-white/50 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Modal Header */}
+        <div className="text-center space-y-2 mb-6">
+          <div className="flex justify-center mb-1">
+            <div className="w-12 h-12 rounded-2xl bg-spotify-green/20 text-spotify-green flex items-center justify-center">
+              <Coins className="w-6 h-6" />
             </div>
           </div>
-
-          <button
-            onClick={() => setBuyCreditsModalOpen(false)}
-            className="w-8 h-8 rounded-xl bg-surface border border-white/10 text-white/60 hover:text-white flex items-center justify-center cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <h3 className="text-xl sm:text-2xl font-bold font-display tracking-wider text-white">
+            TOP UP PITCH CREDITS
+          </h3>
+          <p className="text-xs text-white/60 font-sans max-w-md mx-auto">
+            Fixed server-side pricing. Credits are recorded on an immutable ledger and compensated strictly for curator review time.
+          </p>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {success ? (
-            <div className="py-8 text-center space-y-3">
-              <div className="w-14 h-14 rounded-full bg-spotify-green/20 text-spotify-green border border-spotify-green/40 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <h4 className="text-lg font-display font-bold text-white">PAYPAL TRANSACTION COMPLETED!</h4>
-              <p className="text-xs text-white/70 font-sans">
-                +{selectedPkg.credits} credits deposited to your wallet.
-              </p>
-              {paypalOrderId && (
-                <div className="text-[11px] font-sans text-[#0070BA] bg-[#0070BA]/10 py-1.5 px-3 rounded-xl inline-block border border-[#0070BA]/30">
-                  PayPal Order Ref: {paypalOrderId}
-                </div>
-              )}
+        {errorMessage && (
+          <div className="mb-4 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs font-sans flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {paypalApproveUrl && (
+          <div className="mb-4 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs font-sans space-y-2">
+            <div className="flex items-center gap-2 font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>PayPal Checkout Session Ready</span>
             </div>
+            <p className="text-[11px] text-emerald-200/80">
+              If the PayPal window did not open automatically, please click below to complete your payment:
+            </p>
+            <a
+              href={paypalApproveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-bold text-xs"
+            >
+              <span>Proceed to PayPal</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        )}
+
+        {/* Package Selector */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {PLATFORM_PACKAGES.map((pkg) => {
+            const isSelected = selectedPkgId === pkg.id;
+            return (
+              <div
+                key={pkg.id}
+                onClick={() => setSelectedPkgId(pkg.id)}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-spotify-green/10 border-spotify-green shadow-lg shadow-spotify-green/15 scale-[1.02]'
+                    : 'bg-black/30 border-white/10 hover:border-white/20'
+                }`}
+              >
+                {pkg.popular && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-spotify-green text-black font-mono font-bold text-[9px] uppercase tracking-wider shadow">
+                    Most Popular
+                  </span>
+                )}
+                <div>
+                  <div className="text-xs font-bold text-white font-display mb-1">{pkg.name}</div>
+                  <div className="text-2xl font-black font-display text-spotify-green tracking-tight">
+                    {pkg.credits} <span className="text-xs font-mono font-normal text-white/50">credits</span>
+                  </div>
+                  <div className="text-[11px] text-white/40 font-mono mt-0.5">{pkg.perCredit}</div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                  <span className="text-base font-bold font-display text-white">${pkg.priceUsd.toFixed(2)}</span>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                    isSelected ? 'border-spotify-green bg-spotify-green text-black' : 'border-white/30'
+                  }`}>
+                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Included Features */}
+        <div className="p-4 rounded-2xl bg-black/40 border border-white/5 mb-6 space-y-2">
+          <div className="text-[11px] font-mono text-white/50 uppercase tracking-wider mb-1">
+            Package Inclusions ({selectedPkg.name})
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans text-white/80">
+            {selectedPkg.features.map((f, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-spotify-green flex-shrink-0" />
+                <span>{f}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Checkout Button */}
+        <button
+          onClick={handlePayPalCheckout}
+          disabled={isProcessing}
+          className="w-full py-4 bg-[#0070BA] hover:bg-[#005ea6] text-white font-display font-bold text-sm tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 cursor-pointer transition-all disabled:opacity-50"
+        >
+          {isProcessing ? (
+            <span className="animate-pulse">COMMUNICATING WITH PAYPAL SERVER...</span>
           ) : (
             <>
-              {/* Package selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {PLATFORM_PACKAGES.map(pkg => (
-                  <div
-                    key={pkg.id}
-                    onClick={() => setSelectedPkgId(pkg.id)}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
-                      selectedPkgId === pkg.id
-                        ? 'bg-spotify-green/10 border-spotify-green shadow-lg shadow-spotify-green/10'
-                        : 'bg-surface-hover border-white/10 hover:border-white/30'
-                    }`}
-                  >
-                    {pkg.popular && (
-                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-spotify-green text-[9px] font-sans font-bold text-black rounded-full uppercase whitespace-nowrap">
-                        MOST POPULAR
-                      </span>
-                    )}
-
-                    <div>
-                      <div className="text-xs font-display font-bold text-white">{pkg.name}</div>
-                      <div className="text-xl font-bold font-display text-white mt-1">
-                        ${pkg.priceUsd}
-                      </div>
-                      <div className="text-xs font-bold font-sans text-spotify-green mt-0.5">
-                        {pkg.credits} Credits
-                      </div>
-                    </div>
-
-                    <div className="text-[10px] text-white/50 font-sans mt-2 pt-2 border-t border-white/10">
-                      {pkg.perCredit}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* PayPal Payment Method Banner */}
-              <div className="p-3.5 rounded-2xl border border-[#0070BA]/40 bg-gradient-to-r from-[#003087]/20 to-[#0070BA]/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#0070BA] text-white flex items-center justify-center font-bold text-sm shadow-md">
-                    <i>P</i>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold font-display text-white flex items-center gap-2">
-                      PAYPAL SECURE GATEWAY
-                      <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] rounded-full font-sans">
-                        ACTIVE
-                      </span>
-                    </div>
-                    <div className="text-[10px] font-sans text-white/60">
-                      Supports PayPal Balance, Linked Bank, Debit/Credit Card, & Pay in 4
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-xs font-bold font-sans text-white">
-                    ${selectedPkg.priceUsd} USD
-                  </div>
-                  <div className="text-[9px] font-sans text-white/40">Zero transaction fees</div>
-                </div>
-              </div>
-
-              {/* Selected package features summary */}
-              <div className="bg-surface-hover p-4 rounded-2xl border border-white/10 space-y-2 text-xs font-sans">
-                <div className="text-white font-bold flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-spotify-green" />
-                  PACKAGE PERKS INCLUDED:
-                </div>
-                <ul className="space-y-1 text-white/70 text-[11px]">
-                  {selectedPkg.features.map((f, i) => (
-                    <li key={i} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3 h-3 text-spotify-green" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* PayPal Primary Checkout Button */}
-              <div className="pt-2 space-y-2">
-                <button
-                  disabled={isProcessing}
-                  onClick={handlePayPalCheckout}
-                  className="w-full py-3.5 px-4 rounded-xl font-bold font-display flex items-center justify-center gap-2 cursor-pointer transition-all bg-[#FFC439] hover:bg-[#ffbb1a] text-[#003087] shadow-lg shadow-[#FFC439]/20 disabled:opacity-50 text-sm"
-                >
-                  {isProcessing ? (
-                    <span className="flex items-center gap-2 text-xs font-sans font-bold">
-                      Connecting to PayPal & Crediting Wallet...
-                    </span>
-                  ) : (
-                    <>
-                      <span className="font-extrabold italic text-base tracking-tight">PayPal</span>
-                      <span className="text-xs font-sans text-[#003087]/80">|</span>
-                      <span>Pay ${selectedPkg.priceUsd} USD for {selectedPkg.credits} Credits</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="flex items-center justify-between text-[10px] font-sans text-white/40 px-1">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-spotify-green" />
-                    <span>PayPal Purchase Protection & Instant Real-Time Deposit</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-white/50">
-                    <Lock className="w-3 h-3" />
-                    <span>256-Bit SSL</span>
-                  </div>
-                </div>
-              </div>
+              <Lock className="w-4 h-4" />
+              <span>PAY ${selectedPkg.priceUsd.toFixed(2)} WITH PAYPAL</span>
             </>
           )}
+        </button>
+
+        <div className="mt-3 text-center flex items-center justify-center gap-4 text-[11px] text-white/40 font-sans">
+          <span className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-spotify-green" />
+            100% Anti-Payola Compliant
+          </span>
+          <span>•</span>
+          <span>48h SLA Guarantee</span>
         </div>
       </div>
     </div>

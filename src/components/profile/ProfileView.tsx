@@ -4,19 +4,17 @@ import { BrandLogo } from '../common/BrandLogo';
 import {
   User,
   ShieldCheck,
-  Music2,
-  ListMusic,
   Coins,
-  ExternalLink,
   CheckCircle2,
-  Sparkles,
   Lock,
   Save,
   Radio,
-  Mail,
   Clock,
-  ArrowUpRight,
-  LogIn
+  LogIn,
+  Trash2,
+  AlertTriangle,
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
@@ -29,26 +27,26 @@ export const ProfileView: React.FC = () => {
     userPlaylists,
     setBuyCreditsModalOpen,
     setActiveTab,
-    emailLogs,
-    connectSpotifyOAuth,
     freeWeeklyCredits,
     openLoginModal,
-    openRegisterModal
+    openRegisterModal,
+    deleteAccount,
+    openLegalModal
   } = useApp();
 
   const [name, setName] = useState(currentUser?.name || '');
-  const [email, setEmail] = useState(currentUser?.email || '');
   const [bio, setBio] = useState(currentUser?.bio || '');
-  const [spotifyFollowers, setSpotifyFollowers] = useState(currentUser?.spotifyFollowers || 45000);
+  const [spotifyId, setSpotifyId] = useState(currentUser?.spotifyId || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'details' | 'roles' | 'spotify' | 'emails' | 'security'>('details');
+  const [activeSubTab, setActiveSubTab] = useState<'details' | 'security' | 'danger'>('details');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (currentUser) {
       setName(currentUser.name || '');
-      setEmail(currentUser.email || '');
       setBio(currentUser.bio || '');
-      setSpotifyFollowers(currentUser.spotifyFollowers || 45000);
+      setSpotifyId(currentUser.spotifyId || '');
     }
   }, [currentUser]);
 
@@ -63,7 +61,7 @@ export const ProfileView: React.FC = () => {
             AUTHENTICATION REQUIRED
           </h2>
           <p className="text-sm text-white/60 font-sans max-w-md mx-auto">
-            Please sign in to access your artist & curator profile, manage Spotify playlist verifications, and track real-time pitches.
+            Please sign in with your Supabase credentials to manage your profile, view submissions, and access your personal dashboard.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
             <button
@@ -85,16 +83,22 @@ export const ProfileView: React.FC = () => {
     );
   }
 
+  // Users cannot edit role or credit balance (Phase 2 server-side authorization)
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateUserProfile({
-      name,
-      email,
-      bio,
-      spotifyFollowers
+      name: name.trim(),
+      bio: bio.trim(),
+      spotifyId: spotifyId.trim()
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    await deleteAccount();
+    setIsDeleting(false);
   };
 
   const totalPlaced = artistSubmissions.filter(
@@ -102,515 +106,329 @@ export const ProfileView: React.FC = () => {
   ).length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Profile Header Banner with Brand Logo */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-          <div className="relative">
-            <img
-              src={currentUser.avatarUrl}
-              alt={currentUser.name}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-spotify-green shadow-xl"
-              referrerPolicy="no-referrer"
-            />
-            <span className="absolute -bottom-2 -right-2 px-2.5 py-0.5 bg-spotify-green text-[10px] font-sans text-black rounded-full font-bold uppercase shadow">
-              {activeRole}
-            </span>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <h1 className="text-2xl sm:text-3xl font-display font-bold text-white">{currentUser.name}</h1>
-              {currentUser.verifiedStatus && (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-sans font-bold flex items-center gap-1 border border-emerald-500/30">
-                  <ShieldCheck className="w-3.5 h-3.5" /> SPOTIFY VERIFIED
-                </span>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-fadeIn">
+      {/* Header Profile Card */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-surface">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="relative">
+              <img
+                src={currentUser.avatarUrl || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200`}
+                alt={currentUser.name}
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-spotify-green shadow-xl"
+              />
+              {currentUser.isVerified && (
+                <div
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-spotify-green border-2 border-surface flex items-center justify-center text-black"
+                  title="Verified User"
+                >
+                  <CheckCircle2 className="w-4 h-4 stroke-[3]" />
+                </div>
               )}
             </div>
-            <p className="text-xs text-white/60 font-sans max-w-md">{currentUser.email}</p>
-            <p className="text-xs text-white/70 font-sans mt-1 italic">"{currentUser.bio}"</p>
 
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-2 text-xs font-sans text-white/50">
-              <div className="flex items-center gap-1.5">
-                <BrandLogo size={20} withBadge={false} alt="Brand Logo" />
-                <span>Verified Account</span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight text-white">
+                  {currentUser.name}
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-spotify-green/20 text-spotify-green text-xs font-mono font-bold uppercase border border-spotify-green/30">
+                  {currentUser.role.toUpperCase()}
+                </span>
+                {currentUser.role === 'admin' && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-mono font-bold uppercase border border-purple-500/30">
+                    ADMIN
+                  </span>
+                )}
               </div>
-              <span>•</span>
-              <span>Member since {new Date(currentUser.createdAt).toLocaleDateString()}</span>
-              <span>•</span>
-              <span className="text-spotify-green font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-spotify-green animate-ping" />
-                Real-Time Sync Active
-              </span>
+
+              <p className="text-xs sm:text-sm text-white/60 font-sans max-w-md">
+                {currentUser.email}
+              </p>
+
+              {currentUser.bio && (
+                <p className="text-xs text-white/50 font-sans italic pt-1 max-w-md">
+                  "{currentUser.bio}"
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+            {/* Wallet Quick Action */}
+            <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] text-white/50 font-sans">AVAILABLE CREDITS</div>
+                <div className="text-lg font-bold font-display text-spotify-green">
+                  {currentUser.creditBalance} <span className="text-xs text-white/40">credits</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setBuyCreditsModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold font-display cursor-pointer"
+              >
+                Top Up
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions Right */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <button
-            onClick={() => setBuyCreditsModalOpen(true)}
-            className="w-full sm:w-auto glass-panel px-4 py-3 rounded-2xl border border-white/10 hover:border-spotify-green transition-all flex items-center justify-center gap-2.5 cursor-pointer bg-surface"
-          >
-            <Coins className="w-4 h-4 text-amber-400" />
-            <div className="text-left">
-              <div className="text-[10px] text-white/50 font-sans">SUBMISSION WALLET</div>
-              <div className="text-xs font-bold font-sans text-white">
-                {currentUser.creditBalance} Credits <span className="text-spotify-green font-bold">+Top Up</span>
-              </div>
+        {/* Stats strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/10">
+          <div className="bg-surface-hover/50 p-4 rounded-2xl border border-white/5">
+            <div className="text-xs text-white/50 font-sans">Submissions Sent</div>
+            <div className="text-xl font-bold font-display text-white mt-1">
+              {artistSubmissions.length}
             </div>
-          </button>
+          </div>
 
-          {activeRole === 'artist' ? (
-            <button
-              onClick={() => setActiveTab('artist')}
-              className="w-full sm:w-auto h-11 px-5 rounded-xl font-bold font-display text-xs bg-spotify-green hover:bg-spotify-green-hover text-black flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 transition-colors"
-            >
-              <Music2 className="w-4 h-4" />
-              Go to Artist Hub
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveTab('curator')}
-              className="w-full sm:w-auto h-11 px-5 rounded-xl font-bold font-display text-xs bg-spotify-green hover:bg-spotify-green-hover text-black flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 transition-colors"
-            >
-              <ListMusic className="w-4 h-4" />
-              Go to Curator Portal
-            </button>
-          )}
+          <div className="bg-surface-hover/50 p-4 rounded-2xl border border-white/5">
+            <div className="text-xs text-white/50 font-sans">Placements Won</div>
+            <div className="text-xl font-bold font-display text-spotify-green mt-1">
+              {totalPlaced}
+            </div>
+          </div>
+
+          <div className="bg-surface-hover/50 p-4 rounded-2xl border border-white/5">
+            <div className="text-xs text-white/50 font-sans">Free Weekly Pitches</div>
+            <div className="text-xl font-bold font-display text-white mt-1">
+              {freeWeeklyCredits} / 2
+            </div>
+          </div>
+
+          <div className="bg-surface-hover/50 p-4 rounded-2xl border border-white/5">
+            <div className="text-xs text-white/50 font-sans">Playlists Listed</div>
+            <div className="text-xl font-bold font-display text-white mt-1">
+              {userPlaylists.length}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Profile Overview Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="glass-panel p-4 rounded-2xl border border-white/10 bg-surface">
-          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
-            <span>SPOTIFY REACH</span>
-            <Radio className="w-3.5 h-3.5 text-spotify-green" />
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-display text-white mt-1">
-            {(currentUser.spotifyFollowers || 45000).toLocaleString()}
-          </div>
-          <div className="text-[10px] text-white/40 font-sans mt-0.5">Spotify Followers</div>
-        </div>
-
-        <div className="glass-panel p-4 rounded-2xl border border-white/10 bg-surface">
-          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
-            <span>PITCH CAMPAIGNS</span>
-            <Music2 className="w-3.5 h-3.5 text-spotify-green" />
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-display text-white mt-1">
-            {artistSubmissions.length}
-          </div>
-          <div className="text-[10px] text-spotify-green/80 font-sans mt-0.5">
-            {totalPlaced} Placements Approved
-          </div>
-        </div>
-
-        <div className="glass-panel p-4 rounded-2xl border border-white/10 bg-surface">
-          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
-            <span>MANAGED PLAYLISTS</span>
-            <ListMusic className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-display text-white mt-1">
-            {userPlaylists.length}
-          </div>
-          <div className="text-[10px] text-amber-400/80 font-sans mt-0.5">Connected Channels</div>
-        </div>
-
-        <div className="glass-panel p-4 rounded-2xl border border-white/10 bg-surface">
-          <div className="text-[11px] text-white/50 font-sans flex items-center justify-between">
-            <span>FREE PITCH ALLOWANCE</span>
-            <Coins className="w-3.5 h-3.5 text-spotify-green" />
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-display text-spotify-green mt-1">
-            {freeWeeklyCredits} / 2
-          </div>
-          <div className="text-[10px] text-spotify-green/80 font-sans mt-0.5">Free Pitches this Week</div>
-        </div>
-      </div>
-
-      {/* Sub Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
+      {/* Tabs */}
+      <div className="flex rounded-2xl bg-black/40 p-1.5 border border-white/10 gap-2 max-w-md">
         <button
           onClick={() => setActiveSubTab('details')}
-          className={`px-4 py-2 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-display font-bold tracking-wider rounded-xl transition-all cursor-pointer ${
             activeSubTab === 'details'
-              ? 'bg-spotify-green text-black font-bold'
-              : 'text-white/60 hover:text-white bg-surface-hover'
+              ? 'bg-spotify-green text-black shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white'
           }`}
         >
-          <User className="w-3.5 h-3.5" />
-          ACCOUNT DETAILS
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('roles')}
-          className={`px-4 py-2 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'roles'
-              ? 'bg-spotify-green text-black font-bold'
-              : 'text-white/60 hover:text-white bg-surface-hover'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          SWITCH PERSONA ({activeRole.toUpperCase()})
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('spotify')}
-          className={`px-4 py-2 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'spotify'
-              ? 'bg-spotify-green text-black font-bold'
-              : 'text-white/60 hover:text-white bg-surface-hover'
-          }`}
-        >
-          <Radio className="w-3.5 h-3.5" />
-          SPOTIFY CONNECTION & SYNC
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('emails')}
-          className={`px-4 py-2 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'emails'
-              ? 'bg-spotify-green text-black font-bold'
-              : 'text-white/60 hover:text-white bg-surface-hover'
-          }`}
-        >
-          <Mail className="w-3.5 h-3.5" />
-          DISPATCHED EMAILS ({emailLogs.length})
+          PROFILE SETTINGS
         </button>
 
         <button
           onClick={() => setActiveSubTab('security')}
-          className={`px-4 py-2 rounded-xl text-xs font-display tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-display font-bold tracking-wider rounded-xl transition-all cursor-pointer ${
             activeSubTab === 'security'
-              ? 'bg-spotify-green text-black font-bold'
-              : 'text-white/60 hover:text-white bg-surface-hover'
+              ? 'bg-spotify-green text-black shadow-md shadow-spotify-green/20'
+              : 'text-white/60 hover:text-white'
           }`}
         >
-          <Lock className="w-3.5 h-3.5" />
-          PREFERENCES & SECURITY
+          GOVERNANCE & RLS
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('danger')}
+          className={`flex-1 py-2 text-xs font-display font-bold tracking-wider rounded-xl transition-all cursor-pointer ${
+            activeSubTab === 'danger'
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+              : 'text-rose-400 hover:text-rose-300'
+          }`}
+        >
+          DELETE ACCOUNT
         </button>
       </div>
 
-      {/* SUB TAB 1: Details Form */}
+      {/* SUB TAB 1: Edit Profile Details */}
       {activeSubTab === 'details' && (
         <form onSubmit={handleSaveProfile} className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 bg-surface">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div>
-              <h3 className="text-base font-display font-bold text-white">EDIT PROFILE INFORMATION</h3>
+              <h3 className="text-base font-display font-bold text-white">EDIT USER INFORMATION</h3>
               <p className="text-xs text-white/60 font-sans">
-                Update how curators and artists see your identity across Playlist Plug.
+                Update your public profile, moniker, and biography.
               </p>
             </div>
+
             {savedSuccess && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-sans font-bold">
-                <CheckCircle2 className="w-4 h-4" /> Profile Updated!
+              <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-sans bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Saved to Supabase
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-sans text-white/80 block">Display Name</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-xs font-sans text-white/70 mb-1.5 font-semibold">
+                ARTIST / CURATOR NAME
+              </label>
               <input
                 type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
                 required
-                className="w-full bg-surface-hover text-white px-4 py-2.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-spotify-green transition-colors"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-surface-hover border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-spotify-green font-sans"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-sans text-white/80 block">Account Email</label>
+            <div>
+              <label className="block text-xs font-sans text-white/70 mb-1.5 font-semibold">
+                EMAIL ADDRESS (SUPABASE AUTH)
+              </label>
               <input
                 type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                className="w-full bg-surface-hover text-white px-4 py-2.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-spotify-green transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-sans text-white/80 block">Bio & Sound Identity</label>
-            <textarea
-              rows={3}
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              className="w-full bg-surface-hover text-white p-3 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-spotify-green transition-colors"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-sans text-white/80 block">Spotify Followers Count</label>
-              <input
-                type="number"
-                value={spotifyFollowers}
-                onChange={e => setSpotifyFollowers(Number(e.target.value))}
-                className="w-full bg-surface-hover text-white px-4 py-2.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-spotify-green transition-colors"
+                disabled
+                value={currentUser.email}
+                className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white/50 font-mono cursor-not-allowed"
+                title="Email is locked to your verified Supabase Auth identity"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-sans text-white/80 block">Spotify URI ID</label>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-sans text-white/70 mb-1.5 font-semibold">
+                SPOTIFY USER / ARTIST ID
+              </label>
               <input
                 type="text"
-                disabled
-                value={currentUser.spotifyUri || 'spotify:artist:alex_vance'}
-                className="w-full bg-surface text-white/50 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-sans cursor-not-allowed"
+                value={spotifyId}
+                onChange={(e) => setSpotifyId(e.target.value)}
+                placeholder="e.g. 4cOdK2wGLETKBW3PvgPWqT"
+                className="w-full bg-surface-hover border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-spotify-green font-mono"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-sans text-white/70 mb-1.5 font-semibold">
+                BIOGRAPHY & SOUND DIRECTION
+              </label>
+              <textarea
+                rows={3}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell curators and listeners about your musical journey, genre specializations, and influences..."
+                className="w-full bg-surface-hover border border-white/10 rounded-xl p-4 text-xs text-white placeholder-white/30 focus:outline-none focus:border-spotify-green font-sans"
               />
             </div>
           </div>
 
-          <div className="pt-4 border-t border-white/10 flex justify-end">
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
-              className="h-11 px-6 rounded-xl font-display font-bold text-xs bg-spotify-green hover:bg-spotify-green-hover text-black flex items-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 transition-colors"
+              className="px-6 py-2.5 rounded-xl bg-spotify-green hover:bg-spotify-green-hover text-black font-display font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-colors shadow-lg shadow-spotify-green/20"
             >
-              <Save className="w-4 h-4" /> Save Profile Changes
+              <Save className="w-4 h-4" /> Save Profile
             </button>
           </div>
         </form>
       )}
 
-      {/* SUB TAB 2: Roles Switcher */}
-      {activeSubTab === 'roles' && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 bg-surface">
-          <div>
-            <h3 className="text-base font-display font-bold text-white">ACTIVE USER PERSONA</h3>
-            <p className="text-xs text-white/60 font-sans">
-              Switch your primary workspace mode seamlessly between Artist and Playlist Curator.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Artist Mode Card */}
-            <div
-              onClick={() => switchUserRole('artist')}
-              className={`p-6 rounded-2xl border cursor-pointer transition-all space-y-3 ${
-                activeRole === 'artist'
-                  ? 'bg-spotify-green/10 border-spotify-green ring-1 ring-spotify-green'
-                  : 'bg-surface-hover border-white/10 hover:border-white/30'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-spotify-green flex items-center justify-center text-black font-bold">
-                  <Music2 className="w-5 h-5" />
-                </div>
-                {activeRole === 'artist' && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-spotify-green text-black text-[10px] font-sans font-bold">
-                    ACTIVE PERSONA
-                  </span>
-                )}
-              </div>
-
-              <h4 className="text-lg font-display font-bold text-white">Artist Persona</h4>
-              <p className="text-xs text-white/70 font-sans leading-relaxed">
-                Pitch your new songs, view live campaign progress, manage your track catalog, and purchase credits.
-              </p>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  switchUserRole('artist');
-                  setActiveTab('artist');
-                }}
-                className="h-10 px-4 rounded-xl font-bold font-display text-xs w-full mt-2 cursor-pointer bg-spotify-green hover:bg-spotify-green-hover text-black transition-colors"
-              >
-                Launch Artist Hub
-              </button>
-            </div>
-
-            {/* Curator Mode Card */}
-            <div
-              onClick={() => switchUserRole('curator')}
-              className={`p-6 rounded-2xl border cursor-pointer transition-all space-y-3 ${
-                activeRole === 'curator'
-                  ? 'bg-spotify-green/10 border-spotify-green ring-1 ring-spotify-green'
-                  : 'bg-surface-hover border-white/10 hover:border-white/30'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-spotify-green border border-spotify-green/40">
-                  <ListMusic className="w-5 h-5" />
-                </div>
-                {activeRole === 'curator' && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-spotify-green text-black text-[10px] font-sans font-bold">
-                    ACTIVE PERSONA
-                  </span>
-                )}
-              </div>
-
-              <h4 className="text-lg font-display font-bold text-white">Curator Persona</h4>
-              <p className="text-xs text-white/70 font-sans leading-relaxed">
-                Review submitted pitches in the interactive Studio Player, connect Spotify playlists, and grow your follower ecosystem.
-              </p>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  switchUserRole('curator');
-                  setActiveTab('curator');
-                }}
-                className="h-10 px-4 rounded-xl font-bold font-display text-xs w-full mt-2 cursor-pointer bg-spotify-green hover:bg-spotify-green-hover text-black transition-colors"
-              >
-                Launch Curator Portal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUB TAB 3: Spotify Connection */}
-      {activeSubTab === 'spotify' && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 bg-surface">
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
-            <div>
-              <h3 className="text-base font-display font-bold text-white">SPOTIFY OAUTH & WEB API INTEGRATION</h3>
-              <p className="text-xs text-white/60 font-sans">
-                Real-time synchronization for playlists, track metadata, and follower verification.
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-sans font-bold border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              SPOTIFY WEB API READY
-            </span>
-          </div>
-
-          <div className="bg-surface-hover p-5 rounded-2xl border border-white/10 space-y-4">
-            <div className="flex items-center justify-between text-xs font-sans">
-              <span className="text-white/60">Connected Profile Name:</span>
-              <strong className="text-white">{currentUser.name}</strong>
-            </div>
-
-            <div className="flex items-center justify-between text-xs font-sans">
-              <span className="text-white/60">Spotify User Identifier:</span>
-              <span className="text-white font-mono">{currentUser.spotifyId || 'Not connected'}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs font-sans">
-              <span className="text-white/60">Verification Status:</span>
-              <span className="text-spotify-green font-bold">✓ Spotify Verified Profile</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-            <button
-              onClick={connectSpotifyOAuth}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-spotify-green hover:bg-spotify-green-hover text-black text-xs font-bold font-display flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-spotify-green/20 transition-all"
-            >
-              <Radio className="w-4 h-4" /> Connect Spotify via OAuth Popup
-            </button>
-
-            <a
-              href="https://open.spotify.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-sans text-spotify-green hover:underline flex items-center gap-1.5 font-bold"
-            >
-              Open Spotify Web Player <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* SUB TAB 4: Automated Transactional Emails Log */}
-      {activeSubTab === 'emails' && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 bg-surface">
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
-            <div>
-              <h3 className="text-base font-display font-bold text-white flex items-center gap-2">
-                <Mail className="w-5 h-5 text-spotify-green" />
-                AUTOMATED TRANSACTIONAL EMAILS OUTBOX
-              </h3>
-              <p className="text-xs text-white/60 font-sans">
-                Real-time delivery receipts for curator notifications, submission receipts, and placement celebrations.
-              </p>
-            </div>
-            <span className="text-xs font-sans text-white/50">
-              {emailLogs.length} Emails Logged
-            </span>
-          </div>
-
-          {emailLogs.length === 0 ? (
-            <div className="py-8 text-center text-xs font-sans text-white/50">
-              No emails sent yet. Submit a pitch or review a track to trigger automated notifications.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {emailLogs.map(log => (
-                <div
-                  key={log.id}
-                  className="p-4 rounded-2xl bg-surface-hover border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-sans font-bold uppercase">
-                        {log.status}
-                      </span>
-                      <h4 className="text-xs font-bold text-white font-display">{log.subject}</h4>
-                    </div>
-                    <div className="text-[11px] font-sans text-white/60">
-                      To: <span className="text-white">{log.to}</span> • Template: <span className="text-spotify-green">{log.template}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] font-sans text-white/40 flex items-center gap-1.5 whitespace-nowrap">
-                    <Clock className="w-3.5 h-3.5" />
-                    {new Date(log.sentAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SUB TAB 5: Security & Preferences */}
+      {/* SUB TAB 2: Governance & Security */}
       {activeSubTab === 'security' && (
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 bg-surface">
           <div>
-            <h3 className="text-base font-display font-bold text-white">PREFERENCES & NOTIFICATIONS</h3>
+            <h3 className="text-base font-display font-bold text-white">DATABASE SECURITY & ROW LEVEL SECURITY</h3>
             <p className="text-xs text-white/60 font-sans">
-              Control real-time alerts, email digests, and privacy.
+              Playlist Plug operates on Supabase Postgres with strict Row Level Security (RLS) enforcement.
             </p>
           </div>
 
-          <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-surface-hover rounded-2xl border border-white/10 cursor-pointer">
-              <div>
-                <div className="text-xs font-bold text-white font-sans">Real-time Placement Alerts</div>
-                <div className="text-[11px] text-white/50 font-sans mt-0.5">
-                  Receive immediate notification when your track is added to a Spotify playlist.
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-2">
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-spotify-green" />
+                Row Level Security (RLS)
               </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 accent-spotify-green" />
-            </label>
+              <p className="text-xs text-white/60">
+                You can only view and edit your own profile and pitches. Other users cannot access your private pitch drafts or credit wallet ledger.
+              </p>
+            </div>
 
-            <label className="flex items-center justify-between p-4 bg-surface-hover rounded-2xl border border-white/10 cursor-pointer">
-              <div>
-                <div className="text-xs font-bold text-white font-sans">Curator Review Notifications</div>
-                <div className="text-[11px] text-white/50 font-sans mt-0.5">
-                  Get notified when a new pitch arrives in your Studio deck.
-                </div>
+            <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-2">
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <Lock className="w-4 h-4 text-spotify-green" />
+                Server-Side Authorization
               </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 accent-spotify-green" />
-            </label>
-
-            <label className="flex items-center justify-between p-4 bg-surface-hover rounded-2xl border border-white/10 cursor-pointer">
-              <div>
-                <div className="text-xs font-bold text-white font-sans">Weekly Placement Analytics Digest</div>
-                <div className="text-[11px] text-white/50 font-sans mt-0.5">
-                  Receive summary stream impact statistics via email.
-                </div>
-              </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 accent-spotify-green" />
-            </label>
+              <p className="text-xs text-white/60">
+                All submissions and credit top-ups verify cryptographic Supabase JWT signatures. User roles and balances are never trusted from client payloads.
+              </p>
+            </div>
           </div>
+
+          <div className="pt-4 border-t border-white/10 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => openLegalModal('terms')}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-spotify-green" />
+              <span>Terms of Service</span>
+            </button>
+            <button
+              onClick={() => openLegalModal('privacy')}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5 text-spotify-green" />
+              <span>Privacy Policy</span>
+            </button>
+            <button
+              onClick={() => openLegalModal('refund')}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-spotify-green" />
+              <span>48h SLA Refund Policy</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SUB TAB 3: Account Deletion Flow (Phase 6) */}
+      {activeSubTab === 'danger' && (
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/20 space-y-6 bg-surface">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-display font-bold text-white">PERMANENT ACCOUNT DELETION</h3>
+              <p className="text-xs text-white/60 font-sans mt-1 leading-relaxed">
+                Deleting your account will permanently purge your profile, remove your listed Spotify playlists, archive your pitch submissions, and invalidate active sessions. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          {!showDeleteConfirm ? (
+            <div className="pt-4 border-t border-white/10">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Request Account Deletion
+              </button>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/30 space-y-3">
+              <p className="text-xs text-rose-200 font-sans font-bold">
+                Are you absolutely sure you want to permanently delete your account ({currentUser.email})?
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isDeleting}
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-display font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isDeleting ? 'Deleting Data...' : 'Yes, Permanently Delete My Account'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

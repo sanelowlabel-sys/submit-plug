@@ -59,12 +59,14 @@ export interface Playlist {
   followerCount: number;
   trackCount: number;
   genres: string[];
-  approvalRate: number; // e.g. 14%
+  approvalRate: number | null; // e.g. 14% or null if New
   avgResponseHours: number; // e.g. 18 hours
   pitchCostCredits: number; // e.g. 1 or 2 credits
   freePitchEnabled: boolean;
   spotlightTrack?: Track; // track required for free pitch listen
   isVerified: boolean;
+  verificationCode?: string;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
   isFeatured?: boolean;
   acceptingSubmissions: boolean;
   recentAddedTracks?: Track[];
@@ -193,7 +195,21 @@ export interface CreditPackage {
   features: string[];
 }
 
-export type ActiveTab = 'home' | 'marketplace' | 'artist' | 'curator' | 'profile' | 'emails' | 'dashboard';
+export type ActiveTab = 'home' | 'marketplace' | 'artist' | 'curator' | 'profile' | 'emails' | 'dashboard' | 'admin' | 'terms' | 'privacy' | 'refund';
+
+export interface AbuseReport {
+  id: string;
+  reporterId: string;
+  reporterEmail?: string;
+  targetType: 'playlist' | 'submission' | 'user' | 'track';
+  targetId: string;
+  targetTitle?: string;
+  reason: string;
+  details?: string;
+  status: 'open' | 'investigating' | 'resolved' | 'dismissed';
+  adminNotes?: string;
+  createdAt: string;
+}
 
 export interface ToastNotification {
   id: string;

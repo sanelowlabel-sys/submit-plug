@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -14,31 +14,55 @@ import { emailsRouter } from './server/routes/emails';
 import { supabaseRouter } from './server/routes/supabase';
 import { spotifyRouter } from './server/routes/spotify';
 import { tracksRouter } from './server/routes/tracks';
-import { realtime } from './server/websocket';
-import { exchangeSpotifyCode, fetchSpotifyProfile } from './server/spotify';
-import { db } from './server/db';
+import { adminRouter } from './server/routes/admin';
+import { reportsRouter } from './server/routes/reports';
+import { logsRouter } from './server/routes/logs';
+import { supabaseServerRouter } from './server/supabaseServer';
+import { startScheduler } from './server/scheduler';
 
 dotenv.config();
 
+// Exit at startup if SUPABASE_SERVICE_ROLE_KEY, PAYPAL_WEBHOOK_ID, or the PayPal credentials are missing
+const requiredStartupVars = [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'PAYPAL_WEBHOOK_ID',
+  'PAYPAL_CLIENT_ID',
+  'PAYPAL_CLIENT_SECRET'
+];
+
+const missingStartupVars = requiredStartupVars.filter(
+  (v) => !process.env[v] || process.env[v]?.trim() === ''
+);
+
+if (missingStartupVars.length > 0) {
+  console.error(
+    `[FATAL STARTUP ERROR] Missing required environment variables: ${missingStartupVars.join(', ')}`
+  );
+  process.exit(1);
+}
+
 async function startServer() {
   const app = express();
+  app.set('trust proxy', 1);
+
   const server = http.createServer(app);
-  const PORT = 3000;
+  // Phase 2: Use process.env.PORT
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Body parser middlewares
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-  // Initialize WebSockets
-  realtime.init(server);
+  // Supabase PostgREST & Auth Engine (/auth/v1/* and /rest/v1/*)
+  app.use(supabaseServerRouter);
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      service: 'Submit Plug Real-Time Server',
-      timestamp: new Date().toISOString(),
-      activeWsClients: realtime.getActiveCount()
+      service: 'Playlist Plug API Server',
+      database: 'Supabase PostgreSQL',
+      timestamp: new Date().toISOString()
     });
   });
 
@@ -53,99 +77,24 @@ async function startServer() {
   app.use('/api/supabase', supabaseRouter);
   app.use('/api/spotify', spotifyRouter);
   app.use('/api/tracks', tracksRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/reports', reportsRouter);
+  app.use('/api/logs', logsRouter);
 
-  // Spotify OAuth Callback handler (Popup Flow)
-  app.get(['/auth/callback', '/auth/callback/'], async (req: Request, res: Response) => {
-    const code = req.query.code as string;
-    const state = req.query.state as string;
-    const simulated = req.query.simulated === 'true';
-
-    let userProfile: any = null;
-
-    if (code && !simulated && process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-      try {
-        const origin = req.headers.origin || (process.env.APP_URL ? process.env.APP_URL.replace(/\/$/, '') : `http://${req.headers.host}`);
-        const redirectUri = `${origin}/auth/callback`;
-        const tokenData = await exchangeSpotifyCode(code, redirectUri);
-        if (tokenData.access_token) {
-          const profile = await fetchSpotifyProfile(tokenData.access_token);
-          if (state && db.getUserById(state)) {
-            userProfile = db.updateUser(state, {
-              spotifyId: profile.id,
-              spotifyUri: profile.uri,
-              spotifyFollowers: profile.followers?.total || 3400,
-              avatarUrl: profile.images?.[0]?.url
-            });
-          }
-        }
-      } catch (err) {
-        console.error('[OAuth Callback] Token exchange failed:', err);
-      }
-    } else if (state && db.getUserById(state)) {
-      // Connect simulated Spotify profile for sandbox/testing
-      userProfile = db.updateUser(state, {
-        spotifyId: `spotify_${Math.random().toString(36).substring(2, 8)}`,
-        spotifyFollowers: 4200,
-        verifiedStatus: true
-      });
-    }
-
-    // HTML response that sends postMessage to opener and closes popup cleanly
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Spotify Authentication</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              background: #141414;
-              color: white;
-              text-align: center;
-            }
-            .spinner {
-              border: 3px solid rgba(255,255,255,0.1);
-              border-top: 3px solid #1DB954;
-              border-radius: 50%;
-              width: 36px;
-              height: 36px;
-              animation: spin 0.8s linear infinite;
-              margin: 0 auto 16px;
-            }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          </style>
-        </head>
-        <body>
-          <div>
-            <div class="spinner"></div>
-            <p>Spotify Connected! Closing window...</p>
-          </div>
-          <script>
-            (function() {
-              var payload = {
-                type: 'OAUTH_AUTH_SUCCESS',
-                provider: 'spotify',
-                user: ${JSON.stringify(userProfile || {})},
-                timestamp: Date.now()
-              };
-              if (window.opener) {
-                window.opener.postMessage(payload, '*');
-                setTimeout(function() { window.close(); }, 700);
-              } else {
-                window.location.href = '/';
-              }
-            })();
-          </script>
-        </body>
-      </html>
-    `);
+  // Phase 6: Global Express error monitoring middleware
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('[Unhandled Server Error]', {
+      method: req.method,
+      path: req.path,
+      error: err?.message || String(err),
+      timestamp: new Date().toISOString()
+    });
+    res.status(err.status || 500).json({
+      error: process.env.NODE_ENV === 'production' ? 'An internal server error occurred' : (err.message || 'Server error')
+    });
   });
 
-  // Vite middleware setup
+  // Vite middleware setup (SPA mode in development, static in production)
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -161,10 +110,11 @@ async function startServer() {
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Submit Plug] Server running at http://0.0.0.0:${PORT}`);
+    console.log(`[Playlist Plug] Server running at http://0.0.0.0:${PORT}`);
+    startScheduler();
   });
 }
 
 startServer().catch((err) => {
-  console.error('[Submit Plug] Fatal startup error:', err);
+  console.error('[Playlist Plug] Fatal startup error:', err);
 });

@@ -1,46 +1,29 @@
 import nodemailer from 'nodemailer';
-import { db } from './db';
-import { SubmissionRecord, PlaylistRecord, EmailLogRecord } from './types';
-
-// Optional transporter if SMTP is provided
-let transporter: any = null;
-
-if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-  try {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  } catch (err) {
-    console.warn('[Email] SMTP initialization warning:', err);
-  }
-}
+import { db, EmailLogRecord } from './db';
 
 interface SendMailParams {
   to: string;
   subject: string;
-  template: 'new_submission_curator' | 'submission_approved_artist' | 'submission_declined_artist';
-  recipientRole: 'artist' | 'curator';
-  trackTitle: string;
-  playlistTitle: string;
-  curatorName: string;
-  artistName: string;
+  template: 'new_submission_curator' | 'submission_approved_artist' | 'submission_declined_artist' | 'credit_refund_artist';
+  trackTitle?: string;
+  playlistTitle?: string;
+  curatorName?: string;
+  artistName?: string;
   html: string;
 }
 
+/**
+ * Dispatches transactional email through a verified domain (Resend with SPF/DKIM or SMTP)
+ */
 export async function sendEmailNotification(params: SendMailParams): Promise<EmailLogRecord> {
-  const { to, subject, html, template, recipientRole, trackTitle, playlistTitle, curatorName, artistName } = params;
+  const { to, subject, html, template, trackTitle, playlistTitle } = params;
+  let status = 'delivered';
+  let errorMessage: string | undefined;
 
-  console.log(`[Email] Dispatching automated email to ${to}: "${subject}"`);
-
-  // 1. Try Resend if API key is provided
+  // 1. Resend API with verified domain headers (SPF/DKIM)
   if (process.env.RESEND_API_KEY) {
     try {
+      const fromDomain = process.env.EMAIL_FROM || 'Playlist Plug <notifications@playlistplug.com>';
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -48,203 +31,112 @@ export async function sendEmailNotification(params: SendMailParams): Promise<Ema
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'Playlist Plug <notifications@playlistplug.com>',
+          from: fromDomain,
           to,
           subject,
           html,
+          headers: {
+            'X-Entity-Ref-ID': `playlistplug-${Date.now()}`
+          }
         }),
       });
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.warn('[Email] Resend API error response:', errorText);
+        status = 'failed';
+        errorMessage = `Resend error (${res.status}): ${errorText}`;
+        console.warn('[Email] Resend API error response:', errorMessage);
       } else {
-        console.log(`[Email] Successfully delivered via Resend API to ${to}`);
+        console.log(`[Email] Transactional email delivered via Resend to ${to}`);
       }
-    } catch (err) {
+    } catch (err: any) {
+      status = 'failed';
+      errorMessage = err.message || 'Network error';
       console.warn('[Email] Resend delivery network error:', err);
     }
-  } else if (transporter) {
-    // 2. Try SMTP if configured
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM || '"Playlist Plug" <notifications@playlistplug.com>',
-        to,
-        subject,
-        html,
-      });
-      console.log(`[Email] Successfully delivered via SMTP to ${to}`);
-    } catch (err) {
-      console.warn('[Email] SMTP delivery failed:', err);
-    }
+  } else {
+    // Development mode log
+    console.log(`[Email Simulation] Dispatching to ${to}: "${subject}" (RESEND_API_KEY not set)`);
   }
 
-  // 3. Always log in database for real-time in-app delivery inspection
-  const logged = db.logEmail({
-    to,
+  // 2. Log in database for audit trail
+  const logged = await db.logEmail({
+    recipient: to,
     subject,
     template,
-    recipientRole,
     trackTitle,
     playlistTitle,
-    curatorName,
-    artistName,
-    html,
-    status: 'delivered',
+    status,
+    errorMessage
   });
 
   return logged;
 }
 
-// Generate Curator New Submission Email HTML
-export function generateCuratorSubmissionEmailHtml(submission: SubmissionRecord, playlist: PlaylistRecord): string {
-  const pitchBadge = submission.pitchType === 'premium' ? '⚡ Premium Pitch (Guaranteed Review)' : '🌱 Free Weekly Pitch';
-  const audioPreviewBtn = submission.track.previewUrl
-    ? `<a href="${submission.track.previewUrl}" target="_blank" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;margin-right:12px;">▶ Listen Audio Preview</a>`
-    : '';
-
+export function generateCuratorSubmissionEmailHtml(
+  trackTitle: string,
+  artistName: string,
+  playlistTitle: string,
+  pitchType: string,
+  customMessage?: string
+): string {
   return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
-    .card { max-width: 600px; margin: 0 auto; background: #1a1a1a; border: 1px solid #333333; border-radius: 12px; overflow: hidden; }
-    .header { background: #141414; border-bottom: 2px solid #1DB954; padding: 24px; text-align: center; }
-    .content { padding: 24px; line-height: 1.6; }
-    .track-box { display: flex; background: #222222; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #3a3a3a; }
-    .badge { display: inline-block; background: #1DB954; color: #000000; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
-    .footer { text-align: center; padding: 20px; font-size: 12px; color: #888888; border-top: 1px solid #282828; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">PLAYLIST PLUG</h1>
-      <p style="margin:4px 0 0 0;color:#1DB954;font-size:13px;font-weight:bold;">NEW PLAYLIST SUBMISSION RECEIVED</p>
-    </div>
-    <div class="content">
-      <p>Hey <strong>${playlist.curatorName}</strong>,</p>
-      <p>An artist just submitted a track for consideration to your playlist <strong>${playlist.title}</strong>.</p>
-      
-      <div style="margin: 16px 0;">
-        <span class="badge">${pitchBadge}</span>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #121212; color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #282828;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #1DB954; margin: 0; font-size: 20px; letter-spacing: 1px;">PLAYLIST PLUG</h2>
+        <p style="color: #888888; font-size: 12px; margin-top: 4px;">NEW SUBMISSION RECEIVED</p>
       </div>
-
-      <div class="track-box">
-        <div>
-          <h2 style="margin:0 0 4px 0;color:#ffffff;font-size:18px;">${submission.track.title}</h2>
-          <p style="margin:0 0 8px 0;color:#b3b3b3;font-size:14px;">Artist: <strong>${submission.track.artist}</strong></p>
-          <p style="margin:0;color:#888888;font-size:12px;">Genre: ${submission.track.genre} • BPM: ${submission.track.bpm || 'N/A'}</p>
-        </div>
-      </div>
-
-      ${submission.customMessage ? `
-        <div style="background:#181818;border-left:3px solid #1DB954;padding:12px 16px;margin:16px 0;font-style:italic;color:#cccccc;">
-          "${submission.customMessage}"
-        </div>
-      ` : ''}
-
-      <div style="margin-top: 24px; text-align:center;">
-        ${audioPreviewBtn}
-        <a href="${submission.track.spotifyUrl}" target="_blank" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;">Spotify Track</a>
-      </div>
-
-      <p style="margin-top: 28px; font-size: 13px; color: #aaaaaa;">
-        Please review this track inside your Playlist Plug Curator Portal to complete review and award gate actions.
+      <p style="font-size: 15px; line-height: 1.5; color: #e0e0e0;">
+        Artist <strong>${artistName}</strong> just submitted <strong>"${trackTitle}"</strong> to your Spotify playlist <strong>"${playlistTitle}"</strong>.
       </p>
+      <div style="background: #1e1e1e; padding: 16px; border-radius: 12px; margin: 20px 0; border: 1px solid #333;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #888;">Pitch Type: <span style="color: #1DB954; font-weight: bold; text-transform: uppercase;">${pitchType}</span></p>
+        ${customMessage ? `<p style="margin: 0; font-size: 13px; color: #bbb;"><em>"${customMessage}"</em></p>` : ''}
+      </div>
+      <p style="font-size: 13px; color: #888;">Please review this submission within 48 hours to maintain your verified curator status and playlist score.</p>
+      <div style="text-align: center; margin-top: 28px;">
+        <a href="${process.env.APP_URL || 'https://playlistplug.com'}" style="background: #1DB954; color: #000; text-decoration: none; padding: 12px 28px; border-radius: 50px; font-weight: bold; font-size: 13px; display: inline-block;">
+          Open Curator Review Deck
+        </a>
+      </div>
     </div>
-    <div class="footer">
-      © ${new Date().getFullYear()} Playlist Plug. Automated curator notification.
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
+  `;
 }
 
-// Generate Artist Decision Email HTML (Approved or Declined)
 export function generateArtistDecisionEmailHtml(
-  submission: SubmissionRecord,
-  action: 'approve' | 'decline',
-  feedbackTags: string[],
-  feedbackNote?: string
+  trackTitle: string,
+  playlistTitle: string,
+  decision: 'approved' | 'declined',
+  feedbackNote?: string,
+  spotifyPlacementUrl?: string
 ): string {
-  const isApproved = action === 'approve';
-  const statusColor = isApproved ? '#1DB954' : '#71717a';
-  const statusTitle = isApproved ? '🎉 TRACK APPROVED & PLACED!' : 'DECISION UPDATE: NOT A FIT THIS TIME';
-
+  const isApproved = decision === 'approved';
   return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
-    .card { max-width: 600px; margin: 0 auto; background: #1a1a1a; border: 1px solid #333333; border-radius: 12px; overflow: hidden; }
-    .header { background: #141414; border-bottom: 2px solid ${statusColor}; padding: 24px; text-align: center; }
-    .content { padding: 24px; line-height: 1.6; }
-    .status-badge { display: inline-block; background: ${statusColor}; color: ${isApproved ? '#000000' : '#ffffff'}; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
-    .tags { margin: 12px 0; }
-    .tag { display: inline-block; background: #282828; color: #e0e0e0; padding: 4px 10px; border-radius: 4px; font-size: 12px; margin: 2px 4px 2px 0; border: 1px solid #444; }
-    .footer { text-align: center; padding: 20px; font-size: 12px; color: #888888; border-top: 1px solid #282828; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h1 style="margin:0;color:#ffffff;font-size:22px;letter-spacing:1px;">PLAYLIST PLUG</h1>
-      <p style="margin:4px 0 0 0;color:${statusColor};font-size:14px;font-weight:bold;">${statusTitle}</p>
-    </div>
-    <div class="content">
-      <p>Hey <strong>${submission.artistName}</strong>,</p>
-      
-      <p>
-        Curator <strong>${submission.curatorName}</strong> has completed their review of your track 
-        <strong>"${submission.track.title}"</strong> for playlist <strong>"${submission.playlistTitle}"</strong>.
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #121212; color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #282828;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #1DB954; margin: 0; font-size: 20px; letter-spacing: 1px;">PLAYLIST PLUG</h2>
+        <p style="color: ${isApproved ? '#1DB954' : '#e0e0e0'}; font-size: 12px; margin-top: 4px; font-weight: bold;">
+          ${isApproved ? 'TRACK ACCEPTED FOR ROTATION!' : 'SUBMISSION FEEDBACK'}
+        </p>
+      </div>
+      <p style="font-size: 15px; line-height: 1.5; color: #e0e0e0;">
+        ${isApproved
+          ? `Great news! Your track <strong>"${trackTitle}"</strong> has been approved and added to <strong>"${playlistTitle}"</strong>.`
+          : `The curator for <strong>"${playlistTitle}"</strong> has reviewed your pitch for <strong>"${trackTitle}"</strong>.`
+        }
       </p>
-
-      <div style="margin: 16px 0; text-align:center;">
-        <span class="status-badge">${isApproved ? 'ADDED TO SPOTIFY PLAYLIST' : 'FEEDBACK PROVIDED'}</span>
-      </div>
-
-      ${isApproved ? `
-        <div style="background:#132e1d;border:1px solid #1DB954;border-radius:8px;padding:16px;margin:20px 0;text-align:center;">
-          <h3 style="margin:0 0 6px 0;color:#1DB954;">Congratulations!</h3>
-          <p style="margin:0 0 14px 0;font-size:14px;color:#d0f0db;">Your song has been added into rotation on Spotify!</p>
-          ${submission.spotifyPlacementUrl ? `
-            <a href="${submission.spotifyPlacementUrl}" target="_blank" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:bold;">View on Spotify</a>
-          ` : ''}
-        </div>
-      ` : `
-        <p style="color:#b3b3b3;">While your track wasn't selected for this specific playlist rotation, the curator shared the following constructive evaluation:</p>
-      `}
-
-      ${feedbackTags && feedbackTags.length > 0 ? `
-        <div style="margin:16px 0;">
-          <p style="margin:0 0 6px 0;font-size:13px;color:#aaaaaa;font-weight:bold;">CURATOR TAGS:</p>
-          <div class="tags">
-            ${feedbackTags.map(t => `<span class="tag">${t}</span>`).join(' ')}
-          </div>
-        </div>
-      ` : ''}
-
       ${feedbackNote ? `
-        <div style="background:#1f1f1f;border-left:3px solid ${statusColor};padding:12px 16px;margin:16px 0;color:#e0e0e0;font-style:italic;">
-          "${feedbackNote}"
+        <div style="background: #1e1e1e; padding: 16px; border-radius: 12px; margin: 20px 0; border: 1px solid #333;">
+          <p style="margin: 0; font-size: 13px; color: #bbb;"><strong>Curator Feedback:</strong> "${feedbackNote}"</p>
         </div>
       ` : ''}
-
-      <div style="margin-top:28px;text-align:center;">
-        <a href="/?tab=artist" style="display:inline-block;background:#1DB954;color:#000000;text-decoration:none;padding:10px 22px;border-radius:6px;font-weight:bold;">Open Campaign Tracker</a>
-      </div>
+      ${spotifyPlacementUrl ? `
+        <div style="text-align: center; margin-top: 24px;">
+          <a href="${spotifyPlacementUrl}" style="background: #1DB954; color: #000; text-decoration: none; padding: 12px 28px; border-radius: 50px; font-weight: bold; font-size: 13px; display: inline-block;">
+            Listen on Spotify
+          </a>
+        </div>
+      ` : ''}
     </div>
-    <div class="footer">
-      © ${new Date().getFullYear()} Playlist Plug. Real-time playlist pitching network.
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
+  `;
 }

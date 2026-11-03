@@ -355,7 +355,7 @@ export const HeroSection: React.FC = () => {
                       <div className="mt-1 flex items-center gap-2 text-[11px] font-sans text-white/70">
                         <span className="text-spotify-green font-semibold">{(playlist.followerCount).toLocaleString()} followers</span>
                         <span>•</span>
-                        <span>{playlist.approvalRate}% accept</span>
+                        <span>{playlist.approvalRate !== null && playlist.approvalRate !== undefined ? `${playlist.approvalRate}% accept` : 'New'}</span>
                       </div>
                     </div>
                   </div>

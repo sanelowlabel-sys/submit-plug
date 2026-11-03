@@ -1,134 +1,247 @@
-export interface SpotifyUserProfile {
+/**
+ * Spotify Service without OAuth dependence
+ * - Fetches metadata via Spotify's public oEmbed API and client-credentials flow with caching
+ * - Handles missing preview URLs gracefully
+ * - Supports one-time code playlist description verification
+ */
+
+export interface SpotifyParsedItem {
   id: string;
-  display_name: string;
-  email?: string;
-  images?: Array<{ url: string }>;
-  followers?: { total: number };
-  uri: string;
-  external_urls: { spotify: string };
+  type: 'track' | 'playlist' | 'album' | 'artist';
+  title: string;
+  authorName?: string;
+  thumbnailUrl: string;
+  embedHtml: string;
+  spotifyUrl: string;
+  previewUrl?: string;
+  durationSec?: number;
+  genres?: string[];
+  trackCount?: number;
 }
 
-export interface SpotifyPlaylistSummary {
-  id: string;
-  name: string;
-  description: string;
-  images: Array<{ url: string }>;
-  tracks: { total: number };
-  external_urls: { spotify: string };
-  uri: string;
+// In-memory cache with 1-hour TTL
+interface CacheEntry {
+  data: SpotifyParsedItem;
+  timestamp: number;
 }
+const metadataCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-const SPOTIFY_AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
-const SPOTIFY_TOKEN_ENDPOINT = 'https://accounts.spotify.com/api/token';
-const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
+// Cached Client Credentials Token
+let clientCredentialsToken: { token: string; expiresAt: number } | null = null;
 
-export const SPOTIFY_SCOPES = [
-  'user-read-email',
-  'user-read-private',
-  'playlist-read-private',
-  'playlist-read-collaborative',
-  'playlist-modify-public',
-  'playlist-modify-private',
-  'user-library-modify',
-  'user-library-read',
-  'user-follow-modify',
-  'user-follow-read'
-].join(' ');
-
-export function getSpotifyAuthUrl(redirectUri: string, state?: string): string {
-  const clientId = process.env.SPOTIFY_CLIENT_ID || '';
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: 'code',
-    redirect_uri: redirectUri,
-    scope: SPOTIFY_SCOPES,
-    show_dialog: 'true',
-    ...(state ? { state } : {})
-  });
-
-  return `${SPOTIFY_AUTH_ENDPOINT}?${params.toString()}`;
-}
-
-export async function exchangeSpotifyCode(code: string, redirectUri: string) {
+async function getClientCredentialsToken(): Promise<string | null> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
 
-  if (!clientId || !clientSecret) {
-    throw new Error('Spotify API credentials (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET) are not configured in environment variables.');
+  const now = Date.now();
+  if (clientCredentialsToken && clientCredentialsToken.expiresAt > now + 60000) {
+    return clientCredentialsToken.token;
   }
 
-  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  try {
+    const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'grant_type=client_credentials'
+    });
 
-  const response = await fetch(SPOTIFY_TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${authHeader}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri
-    }).toString()
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Spotify token exchange failed (${response.status}): ${errText}`);
-  }
-
-  return response.json();
-}
-
-export async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyUserProfile> {
-  const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`
+    if (res.ok) {
+      const data = await res.json();
+      clientCredentialsToken = {
+        token: data.access_token,
+        expiresAt: now + (data.expires_in * 1000)
+      };
+      return clientCredentialsToken.token;
     }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Spotify profile: ${response.statusText}`);
+  } catch (err) {
+    console.warn('[Spotify] Client credentials token error:', err);
   }
-
-  return response.json();
+  return null;
 }
 
-export async function fetchSpotifyUserPlaylists(accessToken: string): Promise<SpotifyPlaylistSummary[]> {
-  const response = await fetch(`${SPOTIFY_API_BASE}/me/playlists?limit=50`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user playlists: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.items || [];
-}
-
-// Extract clean Spotify ID from standard URLs or URIs
-export function extractSpotifyId(input: string, type: 'playlist' | 'track' | 'user'): string | null {
+/**
+ * Extract clean Spotify ID and type from URL or URI
+ */
+export function extractSpotifyInfo(input: string): { id: string; type: 'track' | 'playlist' | 'album' | 'artist' } | null {
   if (!input) return null;
   const trimmed = input.trim();
 
-  // uri format: spotify:playlist:37i9dQZF1DXdLEN7aqioXM
-  if (trimmed.startsWith(`spotify:${type}:`)) {
-    return trimmed.split(':')[2] || null;
+  // uri format: spotify:track:4cOdK2wGLETKBW3PvgPWqT
+  const uriMatch = trimmed.match(/^spotify:(track|playlist|album|artist):([a-zA-Z0-9]+)/i);
+  if (uriMatch) {
+    return {
+      type: uriMatch[1].toLowerCase() as any,
+      id: uriMatch[2]
+    };
   }
 
-  // url format: https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM?si=...
-  const urlMatch = trimmed.match(new RegExp(`open\\.spotify\\.com\\/${type}\\/([a-zA-Z0-9]+)`));
-  if (urlMatch && urlMatch[1]) {
-    return urlMatch[1];
-  }
-
-  // Raw ID check (alphanumeric 22 chars typically)
-  if (/^[a-zA-Z0-9]{20,24}$/.test(trimmed)) {
-    return trimmed;
+  // url format: https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT?si=...
+  const urlMatch = trimmed.match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(?:embed\/)?(track|playlist|album|artist)\/([a-zA-Z0-9]+)/i);
+  if (urlMatch) {
+    return {
+      type: urlMatch[1].toLowerCase() as any,
+      id: urlMatch[2]
+    };
   }
 
   return null;
+}
+
+/**
+ * Fetch Spotify Metadata using public oEmbed or Client Credentials with caching
+ */
+export async function fetchSpotifyMetadata(url: string): Promise<SpotifyParsedItem | null> {
+  const parsed = extractSpotifyInfo(url);
+  if (!parsed) return null;
+
+  const cacheKey = `${parsed.type}:${parsed.id}`;
+  const cached = metadataCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const canonicalUrl = `https://open.spotify.com/${parsed.type}/${parsed.id}`;
+  const token = await getClientCredentialsToken();
+
+  // 1. Try Spotify Web API with Client Credentials if configured
+  if (token) {
+    try {
+      if (parsed.type === 'track') {
+        const res = await fetch(`https://api.spotify.com/v1/tracks/${parsed.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const trackData = await res.json();
+          const item: SpotifyParsedItem = {
+            id: parsed.id,
+            type: 'track',
+            title: trackData.name,
+            authorName: trackData.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+            thumbnailUrl: trackData.album?.images?.[0]?.url || 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=400&fit=crop',
+            embedHtml: `<iframe src="https://open.spotify.com/embed/track/${parsed.id}?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`,
+            spotifyUrl: canonicalUrl,
+            previewUrl: trackData.preview_url || undefined, // gracefully handle missing preview URL
+            durationSec: Math.floor(trackData.duration_ms / 1000)
+          };
+          metadataCache.set(cacheKey, { data: item, timestamp: Date.now() });
+          return item;
+        }
+      } else if (parsed.type === 'playlist') {
+        const res = await fetch(`https://api.spotify.com/v1/playlists/${parsed.id}?fields=id,name,description,images,owner,tracks.total`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const plData = await res.json();
+          const item: SpotifyParsedItem = {
+            id: parsed.id,
+            type: 'playlist',
+            title: plData.name,
+            authorName: plData.owner?.display_name || 'Spotify Curator',
+            thumbnailUrl: plData.images?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&fit=crop',
+            embedHtml: `<iframe src="https://open.spotify.com/embed/playlist/${parsed.id}?utm_source=generator&theme=0" width="100%" height="352" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`,
+            spotifyUrl: canonicalUrl,
+            trackCount: plData.tracks?.total || 0
+          };
+          metadataCache.set(cacheKey, { data: item, timestamp: Date.now() });
+          return item;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Spotify API] Request failed, falling back to public oEmbed:', apiErr);
+    }
+  }
+
+  // 2. Public oEmbed Endpoint (Requires NO authentication or tokens)
+  try {
+    const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(canonicalUrl)}`;
+    const res = await fetch(oembedUrl);
+    if (res.ok) {
+      const oembedData = await res.json();
+      const item: SpotifyParsedItem = {
+        id: parsed.id,
+        type: parsed.type,
+        title: oembedData.title || `${parsed.type.toUpperCase()} #${parsed.id.slice(0, 6)}`,
+        authorName: oembedData.author_name || 'Spotify Creator',
+        thumbnailUrl: oembedData.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&fit=crop',
+        embedHtml: oembedData.html || `<iframe src="https://open.spotify.com/embed/${parsed.type}/${parsed.id}?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`,
+        spotifyUrl: canonicalUrl
+      };
+      metadataCache.set(cacheKey, { data: item, timestamp: Date.now() });
+      return item;
+    }
+  } catch (oembedErr) {
+    console.warn('[Spotify oEmbed] Request failed:', oembedErr);
+  }
+
+  // 3. Fallback structure if network to external Spotify endpoints is restricted
+  const fallbackItem: SpotifyParsedItem = {
+    id: parsed.id,
+    type: parsed.type,
+    title: `${parsed.type.toUpperCase()} (#${parsed.id.slice(0, 6)})`,
+    authorName: 'Verified Spotify Creator',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=400&fit=crop',
+    embedHtml: `<iframe src="https://open.spotify.com/embed/${parsed.type}/${parsed.id}?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`,
+    spotifyUrl: canonicalUrl
+  };
+  return fallbackItem;
+}
+
+/**
+ * Generate a unique verification code for playlist ownership verification
+ */
+export function generatePlaylistVerificationCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `PLUG-VERIFY-${code}`;
+}
+
+/**
+ * Verify playlist description contains the verification code
+ */
+export async function verifyPlaylistDescriptionCode(
+  spotifyPlaylistUrl: string,
+  expectedCode: string
+): Promise<{ verified: boolean; message: string; description?: string }> {
+  const parsed = extractSpotifyInfo(spotifyPlaylistUrl);
+  if (!parsed || parsed.type !== 'playlist') {
+    return { verified: false, message: 'Invalid Spotify playlist URL.' };
+  }
+
+  const token = await getClientCredentialsToken();
+  if (token) {
+    try {
+      const res = await fetch(`https://api.spotify.com/v1/playlists/${parsed.id}?fields=description`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const description = data.description || '';
+        if (description.includes(expectedCode)) {
+          return { verified: true, message: 'Verification code confirmed in playlist description!', description };
+        }
+        return {
+          verified: false,
+          message: `Verification code "${expectedCode}" was not found in the playlist description. Current description: "${description.slice(0, 80)}..."`,
+          description
+        };
+      }
+    } catch (err: any) {
+      console.warn('[Spotify Verify] API error:', err);
+    }
+  }
+
+  // If Client Credentials are not configured or rate-limited, provide clear fallback guidance
+  return {
+    verified: false,
+    message: 'Could not automatically inspect playlist description. Please submit for manual admin review below.'
+  };
 }

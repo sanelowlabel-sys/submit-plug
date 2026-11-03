@@ -1,737 +1,943 @@
-import fs from 'fs';
-import path from 'path';
-import {
-  UserRecord,
-  PlaylistRecord,
-  SubmissionRecord,
-  TransactionRecord,
-  EmailLogRecord,
-  CuratorActivityRecord,
-  TrackRecord
-} from './types';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from './supabase';
 
-interface DatabaseSchema {
-  users: UserRecord[];
-  playlists: PlaylistRecord[];
-  submissions: SubmissionRecord[];
-  transactions: TransactionRecord[];
-  emails: EmailLogRecord[];
-  curatorActivities: CuratorActivityRecord[];
-  tracks: TrackRecord[];
-  lastWeeklyCheck: string;
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+  role: 'artist' | 'curator' | 'admin';
+  spotifyId?: string;
+  spotifyUri?: string;
+  spotifyFollowers?: number;
+  bio?: string;
+  creditBalance: number;
+  freeWeeklyCredits: number;
+  lastWeeklyReset?: string;
+  isVerified: boolean;
+  curatorStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
 }
 
-const DB_FILE = path.join(process.cwd(), 'data', 'app_database.json');
+export interface PlaylistRecord {
+  id: string;
+  title: string;
+  description: string;
+  curatorId: string;
+  curatorName: string;
+  curatorAvatar?: string;
+  curatorSpotifyId?: string;
+  coverArt: string;
+  spotifyUrl: string;
+  spotifyUri: string;
+  followerCount: number;
+  trackCount: number;
+  genres: string[];
+  pitchCostCredits: number;
+  freePitchEnabled: boolean;
+  avgResponseHours: number;
+  approvalRate: number | null;
+  isActive: boolean;
+  isVerified: boolean;
+  verificationCode?: string;
+  verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected';
+  spotlightTrack?: any;
+  createdAt: string;
+  updatedAt: string;
+}
 
-// Authentic initial data for immediate production functionality
-const INITIAL_TRACKS: TrackRecord[] = [
-  {
-    id: 'trk-1',
-    title: 'Neon Horizon',
-    artist: 'Velvet Echoes',
-    albumArt: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
-    spotifyUrl: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
-    spotifyUri: 'spotify:track:4cOdK2wGLETKBW3PvgPWqT',
-    previewUrl: 'https://cdn.freesound.org/previews/573/573381_5674468-lq.mp3',
-    durationSec: 214,
-    genre: 'Synthwave',
-    bpm: 118,
-    key: 'F Minor',
-    releaseDate: '2026-02-14',
-    playCount: 14820
-  },
-  {
-    id: 'trk-2',
-    title: 'Caffeine & Raindrops',
-    artist: 'Luna Drift',
-    albumArt: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=400&q=80',
-    spotifyUrl: 'https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl',
-    spotifyUri: 'spotify:track:11dFghVXANMlKmJXsNCbNl',
-    previewUrl: 'https://cdn.freesound.org/previews/450/450621_649468-lq.mp3',
-    durationSec: 168,
-    genre: 'Lo-Fi Chill',
-    bpm: 84,
-    key: 'C Major',
-    releaseDate: '2026-01-20',
-    playCount: 38400
-  },
-  {
-    id: 'trk-3',
-    title: 'Analog Dreamscape',
-    artist: 'Sane Low Sound',
-    albumArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
-    spotifyUrl: 'https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b',
-    spotifyUri: 'spotify:track:0VjIjW4GlUZAMYd2vXMi3b',
-    previewUrl: 'https://cdn.freesound.org/previews/608/608645_11861866-lq.mp3',
-    durationSec: 195,
-    genre: 'Indie Electronic',
-    bpm: 122,
-    key: 'A Minor',
-    releaseDate: '2026-03-01',
-    playCount: 8900
-  },
-  {
-    id: 'trk-4',
-    title: 'Midnight Highway',
-    artist: 'The Midnight City',
-    albumArt: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
-    spotifyUrl: 'https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp',
-    spotifyUri: 'spotify:track:3n3Ppam7vgaVa1iaRUc9Lp',
-    previewUrl: 'https://cdn.freesound.org/previews/512/512140_9287244-lq.mp3',
-    durationSec: 232,
-    genre: 'Indie Rock',
-    bpm: 128,
-    key: 'E Minor',
-    releaseDate: '2025-11-10',
-    playCount: 52100
+export interface SubmissionRecord {
+  id: string;
+  trackId: string;
+  track: any;
+  artistId: string;
+  artistName: string;
+  artistAvatar?: string;
+  playlistId: string;
+  playlistTitle: string;
+  playlistCover?: string;
+  curatorId: string;
+  curatorName: string;
+  pitchType: 'free' | 'premium';
+  pitchCost: number;
+  status: 'pending' | 'approved' | 'declined' | 'added_to_playlist';
+  customMessage?: string;
+  feedbackTags?: string[];
+  feedbackNote?: string;
+  spotifyPlacementUrl?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+}
+
+export interface LedgerRecord {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'purchase' | 'free_pitch' | 'premium_pitch' | 'refund' | 'weekly_reset' | 'admin_adjustment';
+  description: string;
+  status: 'completed' | 'pending' | 'failed';
+  paypalOrderId?: string;
+  paypalAmountUsd?: number;
+  paypalPayerEmail?: string;
+  createdAt: string;
+}
+
+export interface ReportRecord {
+  id: string;
+  reporterId: string;
+  reporterEmail?: string;
+  targetType: 'playlist' | 'submission' | 'user' | 'track';
+  targetId: string;
+  targetTitle?: string;
+  reason: string;
+  details?: string;
+  status: 'open' | 'investigating' | 'resolved' | 'dismissed';
+  adminNotes?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface EmailLogRecord {
+  id: string;
+  recipient: string;
+  subject: string;
+  template: string;
+  trackTitle?: string;
+  playlistTitle?: string;
+  status: string;
+  errorMessage?: string;
+  sentAt: string;
+}
+
+function getClient(): SupabaseClient {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase client is not initialized or database credentials are missing.');
   }
-];
+  return client;
+}
 
-const INITIAL_USERS: UserRecord[] = [
-  {
-    id: 'usr_curator_1',
-    name: 'Sarah Chen (Echo Playlists)',
-    email: 'sarah@echowaves.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    role: 'curator',
-    spotifyId: 'echoplaylists_official',
-    spotifyUri: 'spotify:user:echoplaylists_official',
-    spotifyFollowers: 48900,
-    bio: 'Verified Spotify editorial playlist curator. Discovering emerging indie, synthwave, and lo-fi producers worldwide.',
-    creditBalance: 10,
-    freeWeeklyCredits: 2,
-    lastWeeklyReset: new Date().toISOString(),
-    verifiedStatus: true,
-    totalSubmissions: 142,
-    totalPlacements: 48,
-    createdAt: '2025-10-05T09:30:00Z'
-  },
-  {
-    id: 'usr_curator_2',
-    name: 'Marcus Brody',
-    email: 'marcus@bassdimension.fm',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    role: 'curator',
-    spotifyId: 'marcus_clubradar',
-    spotifyUri: 'spotify:user:marcus_clubradar',
-    spotifyFollowers: 82500,
-    bio: 'Club DJ and resident tastemaker for Berlin underground electro & melodic techno.',
-    creditBalance: 5,
-    freeWeeklyCredits: 2,
-    lastWeeklyReset: new Date().toISOString(),
-    verifiedStatus: true,
-    totalSubmissions: 280,
-    totalPlacements: 35,
-    createdAt: '2025-08-12T14:15:00Z'
-  },
-  {
-    id: 'usr_artist_1',
-    name: 'Velvet Echoes',
-    email: 'artist@neonhorizon.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    role: 'artist',
-    spotifyId: 'velvetechoes_music',
-    spotifyUri: 'spotify:user:velvetechoes_music',
-    spotifyFollowers: 14200,
-    bio: 'Synth-pop & melodic electronica producer craft-building vintage synthesizer soundscapes.',
-    creditBalance: 15,
-    freeWeeklyCredits: 2,
-    lastWeeklyReset: new Date().toISOString(),
-    verifiedStatus: true,
-    totalSubmissions: 6,
-    totalPlacements: 4,
-    createdAt: '2025-11-01T10:00:00Z'
-  },
-  {
-    id: 'usr_sanelow_1',
-    name: 'Sane Low Label',
-    email: 'SanelowLabel@gmail.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80',
-    role: 'artist',
-    spotifyId: 'sanelowlabel',
-    spotifyUri: 'spotify:user:sanelowlabel',
-    spotifyFollowers: 85400,
-    bio: 'Independent record label hub for organic artist pitching and global electronic sound discovery.',
-    creditBalance: 25,
-    freeWeeklyCredits: 2,
-    lastWeeklyReset: new Date().toISOString(),
-    verifiedStatus: true,
-    totalSubmissions: 12,
-    totalPlacements: 8,
-    createdAt: '2025-10-01T12:00:00Z'
-  }
-];
+/**
+ * Supabase Postgres Primary Database Engine.
+ * All operations execute strictly against Supabase Postgres with Row Level Security.
+ * Zero in-memory fallbacks: any error from Supabase is thrown immediately.
+ */
+class SupabasePostgresDatabase {
+  // ==========================================
+  // PROFILES / USERS
+  // ==========================================
+  public async getUserProfile(id: string): Promise<UserRecord | null> {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-const INITIAL_PLAYLISTS: PlaylistRecord[] = [
-  {
-    id: 'pl-synth-1',
-    title: 'Synthwave & Cyber Retrowave',
-    description: 'The premier destination for 80s inspired retro-electro, darksynth, outrun, and cyberpunk neon grooves.',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    curatorSpotifyId: 'echoplaylists_official',
-    coverArt: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
-    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM',
-    spotifyUri: 'spotify:playlist:37i9dQZF1DXdLEN7aqioXM',
-    followerCount: 48900,
-    trackCount: 82,
-    genres: ['Synthwave', 'Electronic', 'Retrowave'],
-    approvalRate: 14,
-    avgResponseHours: 18,
-    pitchCostCredits: 1,
-    freePitchEnabled: true,
-    isVerified: true,
-    isFeatured: true,
-    acceptingSubmissions: true,
-    lastActiveAt: '12m ago',
-    spotlightTrack: INITIAL_TRACKS[0],
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false,
-      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Failed to fetch user profile: ${error.message}`);
     }
-  },
-  {
-    id: 'pl-lofi-2',
-    title: 'Midnight Lo-Fi & Chill Study Beats',
-    description: 'Late night lofi hip hop, cozy jazzhop, and downtempo instrumental coffee shop vibrations for focusing.',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    curatorSpotifyId: 'echoplaylists_official',
-    coverArt: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=600&q=80',
-    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
-    spotifyUri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M',
-    followerCount: 34200,
-    trackCount: 120,
-    genres: ['Lo-Fi Chill', 'Chillhop', 'Ambient'],
-    approvalRate: 18,
-    avgResponseHours: 12,
-    pitchCostCredits: 1,
-    freePitchEnabled: true,
-    isVerified: true,
-    isFeatured: true,
-    acceptingSubmissions: true,
-    lastActiveAt: '35m ago',
-    spotlightTrack: INITIAL_TRACKS[1],
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false,
-      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
-    }
-  },
-  {
-    id: 'pl-techno-3',
-    title: 'Berlin Melodic Techno Peak Time',
-    description: 'Underground deep driving melodic techno, hypnotic progressive beats, and peak-hour festival energy.',
-    curatorId: 'usr_curator_2',
-    curatorName: 'Marcus Brody',
-    curatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    curatorSpotifyId: 'marcus_clubradar',
-    coverArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
-    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DX6J5J286yRiO',
-    spotifyUri: 'spotify:playlist:37i9dQZF1DX6J5J286yRiO',
-    followerCount: 82500,
-    trackCount: 65,
-    genres: ['Melodic Techno', 'Techno', 'Deep House'],
-    approvalRate: 8,
-    avgResponseHours: 36,
-    pitchCostCredits: 2,
-    freePitchEnabled: false,
-    isVerified: true,
-    isFeatured: true,
-    acceptingSubmissions: true,
-    lastActiveAt: '1h ago',
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false,
-      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/marcus_clubradar'
-    }
-  },
-  {
-    id: 'pl-indie-4',
-    title: 'Indie & Bedroom Pop Discovery Radar',
-    description: 'Curating raw, shimmering bedroom pop, dream pop, and independent alternative indie anthems worldwide.',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    curatorSpotifyId: 'echoplaylists_official',
-    coverArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DX2Nc3B70tvx0',
-    spotifyUri: 'spotify:playlist:37i9dQZF1DX2Nc3B70tvx0',
-    followerCount: 61400,
-    trackCount: 75,
-    genres: ['Indie Rock', 'Bedroom Pop', 'Alternative'],
-    approvalRate: 20,
-    avgResponseHours: 24,
-    pitchCostCredits: 1,
-    freePitchEnabled: true,
-    isVerified: true,
-    isFeatured: false,
-    acceptingSubmissions: true,
-    lastActiveAt: '2h ago',
-    spotlightTrack: INITIAL_TRACKS[3],
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false,
-      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/echoplaylists_official'
-    }
-  },
-  {
-    id: 'pl-deephouse-5',
-    title: 'Deep House Sunset Sessions',
-    description: 'Warm organic house, sunset beach club grooves, melodic deep vibes, and afro-house selections.',
-    curatorId: 'usr_curator_2',
-    curatorName: 'Marcus Brody',
-    curatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    curatorSpotifyId: 'marcus_clubradar',
-    coverArt: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=600&q=80',
-    spotifyUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXa2PvU927Am1',
-    spotifyUri: 'spotify:playlist:37i9dQZF1DXa2PvU927Am1',
-    followerCount: 27400,
-    trackCount: 94,
-    genres: ['Deep House', 'Organic House', 'Electronic'],
-    approvalRate: 16,
-    avgResponseHours: 16,
-    pitchCostCredits: 1,
-    freePitchEnabled: true,
-    isVerified: true,
-    isFeatured: false,
-    acceptingSubmissions: true,
-    lastActiveAt: '45m ago',
-    gates: {
-      requireCuratorFollow: true,
-      requirePlaylistFollow: true,
-      requireSongSave: false,
-      curatorSpotifyProfileUrl: 'https://open.spotify.com/user/marcus_clubradar'
-    }
-  }
-];
 
-const INITIAL_SUBMISSIONS: SubmissionRecord[] = [
-  {
-    id: 'sub-1',
-    track: INITIAL_TRACKS[0],
-    playlistId: 'pl-synth-1',
-    playlistTitle: 'Synthwave & Cyber Retrowave',
-    playlistCover: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    artistId: 'usr_artist_1',
-    artistName: 'Velvet Echoes',
-    artistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    pitchType: 'premium',
-    pitchCost: 1,
-    customMessage: 'Analog synthwave piece crafted with authentic Juno-106 synths and gated 80s drums. Perfect fit for your playlist!',
-    status: 'added_to_playlist',
-    feedbackTags: ['Incredible 80s vibe', 'Flawless mix', 'Spot on playlist mood'],
-    feedbackNote: 'Added to position #4! Amazing track, loving the analog hook.',
-    submittedAt: '2026-03-01T14:30:00Z',
-    reviewedAt: '2026-03-02T10:15:00Z',
-    spotifyPlacementUrl: 'https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM',
-    gateActionsCompleted: {
-      followedCurator: true,
-      followedPlaylist: true,
-      savedSong: true
-    }
-  },
-  {
-    id: 'sub-2',
-    track: INITIAL_TRACKS[1],
-    playlistId: 'pl-lofi-2',
-    playlistTitle: 'Midnight Lo-Fi & Chill Study Beats',
-    playlistCover: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=600&q=80',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    artistId: 'usr_artist_1',
-    artistName: 'Velvet Echoes',
-    artistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    pitchType: 'free',
-    pitchCost: 0,
-    customMessage: 'Calm, reflective lo-fi track with organic rain textures recorded in Tokyo.',
-    status: 'pending',
-    feedbackTags: [],
-    submittedAt: '2026-03-16T18:20:00Z',
-    gateActionsCompleted: {
-      followedCurator: true,
-      followedPlaylist: true,
-      savedSong: false
-    }
-  }
-];
-
-const INITIAL_TRANSACTIONS: TransactionRecord[] = [
-  {
-    id: 'tx-1',
-    userId: 'usr_sanelow_1',
-    userName: 'Sane Low Label',
-    amount: 50,
-    type: 'purchase',
-    description: 'Purchased 50 Submission Credits ($9.99)',
-    createdAt: '2026-02-28T16:00:00Z',
-    status: 'completed',
-    paypalAmountUsd: 9.99,
-    paypalOrderId: 'PAYID-MTT-882109'
-  },
-  {
-    id: 'tx-2',
-    userId: 'usr_sanelow_1',
-    userName: 'Sane Low Label',
-    amount: -1,
-    type: 'premium_pitch',
-    description: 'Pitched "Neon Horizon" to Synthwave & Cyber Retrowave',
-    createdAt: '2026-03-01T14:30:00Z',
-    status: 'completed'
-  },
-  {
-    id: 'tx-3',
-    userId: 'usr_sanelow_1',
-    userName: 'Sane Low Label',
-    amount: 2,
-    type: 'weekly_credit_reset',
-    description: 'Free Weekly Credits Allowance granted',
-    createdAt: new Date().toISOString(),
-    status: 'completed'
-  }
-];
-
-const INITIAL_ACTIVITIES: CuratorActivityRecord[] = [
-  {
-    id: 'act-1',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    action: 'approved',
-    playlistTitle: 'Synthwave & Cyber Retrowave',
-    trackTitle: 'Neon Horizon',
-    timestamp: 'Just now',
-    approvalRate: 14,
-    avgResponseHours: 18
-  },
-  {
-    id: 'act-2',
-    curatorId: 'usr_curator_2',
-    curatorName: 'Marcus Brody',
-    curatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    action: 'came_online',
-    playlistTitle: 'Melodic Techno Peak Time',
-    timestamp: '5 minutes ago',
-    approvalRate: 8,
-    avgResponseHours: 36
-  },
-  {
-    id: 'act-3',
-    curatorId: 'usr_curator_1',
-    curatorName: 'Sarah Chen (Echo Playlists)',
-    curatorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    action: 'reviewed',
-    playlistTitle: 'Midnight Lo-Fi & Study Beats',
-    trackTitle: 'Midnight Tokyo Walk',
-    timestamp: '18 minutes ago',
-    approvalRate: 18,
-    avgResponseHours: 12
-  }
-];
-
-class DatabaseManager {
-  private data: DatabaseSchema;
-  private isLoaded = false;
-
-  constructor() {
-    this.data = {
-      users: INITIAL_USERS,
-      playlists: INITIAL_PLAYLISTS,
-      submissions: INITIAL_SUBMISSIONS,
-      transactions: INITIAL_TRANSACTIONS,
-      emails: [],
-      curatorActivities: INITIAL_ACTIVITIES,
-      tracks: INITIAL_TRACKS,
-      lastWeeklyCheck: new Date().toISOString()
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      avatarUrl: data.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      role: data.role || 'artist',
+      spotifyId: data.spotify_id,
+      spotifyUri: data.spotify_uri,
+      spotifyFollowers: data.spotify_followers || 0,
+      bio: data.bio || '',
+      creditBalance: data.credit_balance || 0,
+      freeWeeklyCredits: data.free_weekly_credits ?? 2,
+      lastWeeklyReset: data.last_weekly_reset,
+      isVerified: data.is_verified || false,
+      curatorStatus: data.curator_status || 'none',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
     };
-    this.init();
   }
 
-  private init() {
-    try {
-      const dir = path.dirname(DB_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+  public async createProfile(profile: Partial<UserRecord> & { id: string; email: string; name: string }): Promise<UserRecord> {
+    const supabase = getClient();
+    const now = new Date().toISOString();
+    const recordToInsert = {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      avatar_url: profile.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      role: profile.role || 'artist',
+      credit_balance: profile.creditBalance ?? 0,
+      free_weekly_credits: profile.freeWeeklyCredits ?? 2,
+      bio: profile.bio || '',
+      spotify_id: profile.spotifyId,
+      spotify_uri: profile.spotifyUri,
+      spotify_followers: profile.spotifyFollowers || 0,
+      is_verified: profile.isVerified || false,
+      curator_status: profile.curatorStatus || (profile.role === 'curator' ? 'pending' : 'none'),
+      last_weekly_reset: now,
+      created_at: now,
+      updated_at: now
+    };
 
-      if (fs.existsSync(DB_FILE)) {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        const parsed = JSON.parse(fileContent);
-        this.data = {
-          users: parsed.users?.length ? parsed.users : INITIAL_USERS,
-          playlists: Array.isArray(parsed.playlists) && parsed.playlists.length > 0 ? parsed.playlists : INITIAL_PLAYLISTS,
-          submissions: Array.isArray(parsed.submissions) && parsed.submissions.length > 0 ? parsed.submissions : INITIAL_SUBMISSIONS,
-          transactions: Array.isArray(parsed.transactions) ? parsed.transactions : INITIAL_TRANSACTIONS,
-          emails: parsed.emails || [],
-          curatorActivities: Array.isArray(parsed.curatorActivities) ? parsed.curatorActivities : INITIAL_ACTIVITIES,
-          tracks: parsed.tracks?.length ? parsed.tracks : INITIAL_TRACKS,
-          lastWeeklyCheck: parsed.lastWeeklyCheck || new Date().toISOString()
-        };
-      } else {
-        this.save();
-      }
-      this.isLoaded = true;
-      this.checkWeeklyCreditsReset();
-    } catch (err) {
-      console.error('Error initializing database:', err);
-      this.data = {
-        users: INITIAL_USERS,
-        playlists: INITIAL_PLAYLISTS,
-        submissions: INITIAL_SUBMISSIONS,
-        transactions: INITIAL_TRANSACTIONS,
-        emails: [],
-        curatorActivities: INITIAL_ACTIVITIES,
-        tracks: INITIAL_TRACKS,
-        lastWeeklyCheck: new Date().toISOString()
-      };
-      this.isLoaded = true;
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(recordToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create user profile: ${error.message}`);
     }
+
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      avatarUrl: data.avatar_url,
+      role: data.role,
+      creditBalance: data.credit_balance,
+      freeWeeklyCredits: data.free_weekly_credits,
+      bio: data.bio,
+      spotifyId: data.spotify_id,
+      spotifyUri: data.spotify_uri,
+      spotifyFollowers: data.spotify_followers,
+      isVerified: data.is_verified,
+      curatorStatus: data.curator_status,
+      lastWeeklyReset: data.last_weekly_reset,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
-  private save() {
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Failed to persist DB to disk:', err);
+  /**
+   * User profile update. USER CANNOT CHANGE ROLE OR CREDIT BALANCE.
+   * Strips role, creditBalance, freeWeeklyCredits, isVerified to prevent tampering.
+   */
+  public async updateUserProfile(
+    userId: string,
+    updates: {
+      name?: string;
+      bio?: string;
+      avatarUrl?: string;
+      spotifyId?: string;
+      spotifyUri?: string;
     }
+  ): Promise<UserRecord | null> {
+    const supabase = getClient();
+    const dbUpdates: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.name && typeof updates.name === 'string') dbUpdates.name = updates.name.trim();
+    if (updates.bio !== undefined && typeof updates.bio === 'string') dbUpdates.bio = updates.bio.trim();
+    if (updates.avatarUrl && typeof updates.avatarUrl === 'string') dbUpdates.avatar_url = updates.avatarUrl.trim();
+    if (updates.spotifyId && typeof updates.spotifyId === 'string') dbUpdates.spotify_id = updates.spotifyId.trim();
+    if (updates.spotifyUri && typeof updates.spotifyUri === 'string') dbUpdates.spotify_uri = updates.spotifyUri.trim();
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(dbUpdates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to update user profile: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      avatarUrl: data.avatar_url,
+      role: data.role,
+      creditBalance: data.credit_balance,
+      freeWeeklyCredits: data.free_weekly_credits,
+      bio: data.bio,
+      spotifyId: data.spotify_id,
+      spotifyUri: data.spotify_uri,
+      spotifyFollowers: data.spotify_followers,
+      isVerified: data.is_verified,
+      curatorStatus: data.curator_status,
+      lastWeeklyReset: data.last_weekly_reset,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
-  // Check and execute weekly free credits allowance reset (resets to 2 credits every 7 days)
-  public checkWeeklyCreditsReset() {
-    const now = new Date();
-    let updated = false;
+  public async deleteUserAccount(userId: string): Promise<boolean> {
+    const supabase = getClient();
+    // Nullify user_id on credit_ledger to preserve financial audit trail (ON DELETE SET NULL)
+    await supabase.from('credit_ledger').update({ user_id: null }).eq('user_id', userId);
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (error) {
+      throw new Error(`Failed to delete user account: ${error.message}`);
+    }
+    return true;
+  }
 
-    this.data.users = this.data.users.map((u) => {
-      const lastReset = u.lastWeeklyReset ? new Date(u.lastWeeklyReset) : new Date(0);
-      const diffDays = (now.getTime() - lastReset.getTime()) / (1000 * 3600 * 24);
+  // ==========================================
+  // PLAYLISTS
+  // ==========================================
+  public async getPlaylists(filters?: {
+    curatorId?: string;
+    isVerified?: boolean;
+    genre?: string;
+    search?: string;
+    onlyActive?: boolean;
+  }): Promise<PlaylistRecord[]> {
+    const supabase = getClient();
+    let query = supabase.from('playlists').select('*');
 
-      if (diffDays >= 7 || u.freeWeeklyCredits === undefined) {
-        updated = true;
-        u.freeWeeklyCredits = 2; // grant 2 free weekly credits
-        u.lastWeeklyReset = now.toISOString();
+    if (filters?.onlyActive) {
+      query = query.eq('is_active', true).eq('verification_status', 'verified');
+    }
+    if (filters?.curatorId) {
+      query = query.eq('curator_id', filters.curatorId);
+    }
+    if (filters?.genre && filters.genre !== 'All' && filters.genre !== 'All Genres') {
+      query = query.contains('genres', [filters.genre]);
+    }
+    if (filters?.search) {
+      query = query.ilike('title', `%${filters.search}%`);
+    }
 
-        this.data.transactions.unshift({
-          id: `tx-reset-${Date.now()}-${u.id}`,
-          userId: u.id,
-          userName: u.name,
-          amount: 2,
-          type: 'weekly_credit_reset',
-          description: 'Weekly free pitch allowance reset (2 Free Credits)',
-          createdAt: now.toISOString(),
-          status: 'completed'
-        });
-      }
-      return u;
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch playlists: ${error.message}`);
+    }
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      description: d.description || '',
+      curatorId: d.curator_id,
+      curatorName: d.curator_name,
+      curatorAvatar: d.curator_avatar,
+      curatorSpotifyId: d.curator_spotify_id,
+      coverArt: d.cover_art,
+      spotifyUrl: d.spotify_url,
+      spotifyUri: d.spotify_uri,
+      followerCount: d.follower_count || 0,
+      trackCount: d.track_count || 0,
+      genres: d.genres || [],
+      pitchCostCredits: d.pitch_cost_credits || 1,
+      freePitchEnabled: d.free_pitch_enabled ?? true,
+      avgResponseHours: d.avg_response_hours || 24,
+      approvalRate: d.approval_rate ?? null,
+      isActive: d.is_active ?? true,
+      isVerified: d.is_verified ?? false,
+      verificationCode: d.verification_code,
+      verificationStatus: d.verification_status || 'unverified',
+      spotlightTrack: d.spotlight_track,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }));
+  }
+
+  public async getPlaylistById(id: string): Promise<PlaylistRecord | null> {
+    const supabase = getClient();
+    const { data, error } = await supabase.from('playlists').select('*').eq('id', id).single();
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to fetch playlist: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description || '',
+      curatorId: data.curator_id,
+      curatorName: data.curator_name,
+      curatorAvatar: data.curator_avatar,
+      curatorSpotifyId: data.curator_spotify_id,
+      coverArt: data.cover_art,
+      spotifyUrl: data.spotify_url,
+      spotifyUri: data.spotify_uri,
+      followerCount: data.follower_count || 0,
+      trackCount: data.track_count || 0,
+      genres: data.genres || [],
+      pitchCostCredits: data.pitch_cost_credits || 1,
+      freePitchEnabled: data.free_pitch_enabled ?? true,
+      avgResponseHours: data.avg_response_hours || 24,
+      approvalRate: data.approval_rate ?? null,
+      isActive: data.is_active ?? true,
+      isVerified: data.is_verified ?? false,
+      verificationCode: data.verification_code,
+      verificationStatus: data.verification_status || 'unverified',
+      spotlightTrack: data.spotlight_track,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  public async createPlaylist(data: Omit<PlaylistRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<PlaylistRecord> {
+    const supabase = getClient();
+    const id = `pl_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const insertData = {
+      id,
+      title: data.title,
+      description: data.description,
+      curator_id: data.curatorId,
+      curator_name: data.curatorName,
+      curator_avatar: data.curatorAvatar,
+      cover_art: data.coverArt,
+      spotify_url: data.spotifyUrl,
+      spotify_uri: data.spotifyUri,
+      follower_count: data.followerCount || 0,
+      track_count: data.trackCount || 0,
+      genres: data.genres || [],
+      pitch_cost_credits: data.pitchCostCredits || 1,
+      free_pitch_enabled: data.freePitchEnabled ?? true,
+      is_active: data.isActive ?? true,
+      is_verified: data.isVerified ?? false,
+      verification_code: data.verificationCode,
+      verification_status: data.verificationStatus || 'unverified',
+      spotlight_track: data.spotlightTrack,
+      created_at: now,
+      updated_at: now
+    };
+
+    const { data: created, error } = await supabase.from('playlists').insert(insertData).select().single();
+    if (error) {
+      throw new Error(`Failed to create playlist: ${error.message}`);
+    }
+
+    return {
+      id: created.id,
+      title: created.title,
+      description: created.description,
+      curatorId: created.curator_id,
+      curatorName: created.curator_name,
+      curatorAvatar: created.curator_avatar,
+      curatorSpotifyId: created.curator_spotify_id,
+      coverArt: created.cover_art,
+      spotifyUrl: created.spotify_url,
+      spotifyUri: created.spotify_uri,
+      followerCount: created.follower_count,
+      trackCount: created.track_count,
+      genres: created.genres,
+      pitchCostCredits: created.pitch_cost_credits,
+      freePitchEnabled: created.free_pitch_enabled,
+      avgResponseHours: created.avg_response_hours || 24,
+      approvalRate: created.approval_rate ?? null,
+      isActive: created.is_active,
+      isVerified: created.is_verified,
+      verificationCode: created.verification_code,
+      verificationStatus: created.verification_status,
+      spotlightTrack: created.spotlight_track,
+      createdAt: created.created_at,
+      updatedAt: created.updated_at
+    };
+  }
+
+  public async updatePlaylist(id: string, updates: Partial<PlaylistRecord>): Promise<PlaylistRecord | null> {
+    const supabase = getClient();
+    const dbUpdates: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.isVerified !== undefined) dbUpdates.is_verified = updates.isVerified;
+    if (updates.verificationStatus) dbUpdates.verification_status = updates.verificationStatus;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.title) dbUpdates.title = updates.title;
+
+    const { data, error } = await supabase.from('playlists').update(dbUpdates).eq('id', id).select().single();
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to update playlist: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description || '',
+      curatorId: data.curator_id,
+      curatorName: data.curator_name,
+      curatorAvatar: data.curator_avatar,
+      curatorSpotifyId: data.curator_spotify_id,
+      coverArt: data.cover_art,
+      spotifyUrl: data.spotify_url,
+      spotifyUri: data.spotify_uri,
+      followerCount: data.follower_count || 0,
+      trackCount: data.track_count || 0,
+      genres: data.genres || [],
+      pitchCostCredits: data.pitch_cost_credits || 1,
+      freePitchEnabled: data.free_pitch_enabled ?? true,
+      avgResponseHours: data.avg_response_hours || 24,
+      approvalRate: data.approval_rate ?? null,
+      isActive: data.is_active ?? true,
+      isVerified: data.is_verified ?? false,
+      verificationCode: data.verification_code,
+      verificationStatus: data.verification_status || 'unverified',
+      spotlightTrack: data.spotlight_track,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  // ==========================================
+  // SUBMISSIONS (ATOMIC SPEND & SUBMIT)
+  // ==========================================
+  public async getSubmissions(filters?: {
+    artistId?: string;
+    curatorId?: string;
+    playlistId?: string;
+    status?: string;
+  }): Promise<SubmissionRecord[]> {
+    const supabase = getClient();
+    let query = supabase.from('submissions').select('*');
+    if (filters?.artistId) query = query.eq('artist_id', filters.artistId);
+    if (filters?.curatorId) query = query.eq('curator_id', filters.curatorId);
+    if (filters?.playlistId) query = query.eq('playlist_id', filters.playlistId);
+    if (filters?.status) query = query.eq('status', filters.status);
+
+    query = query.order('submitted_at', { ascending: false });
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch submissions: ${error.message}`);
+    }
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      trackId: d.track_id,
+      track: d.track,
+      artistId: d.artist_id,
+      artistName: d.artist_name,
+      artistAvatar: d.artist_avatar,
+      playlistId: d.playlist_id,
+      playlistTitle: d.playlist_title,
+      playlistCover: d.playlist_cover,
+      curatorId: d.curator_id,
+      curatorName: d.curator_name,
+      pitchType: d.pitch_type,
+      pitchCost: d.pitch_cost || 0,
+      status: d.status,
+      customMessage: d.custom_message,
+      feedbackTags: d.feedback_tags || [],
+      feedbackNote: d.feedback_note,
+      spotifyPlacementUrl: d.spotify_placement_url,
+      submittedAt: d.submitted_at,
+      reviewedAt: d.reviewed_at
+    }));
+  }
+
+  public async getSubmissionById(id: string): Promise<SubmissionRecord | null> {
+    const supabase = getClient();
+    const { data, error } = await supabase.from('submissions').select('*').eq('id', id).single();
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to fetch submission: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      trackId: data.track_id,
+      track: data.track,
+      artistId: data.artist_id,
+      artistName: data.artist_name,
+      artistAvatar: data.artist_avatar,
+      playlistId: data.playlist_id,
+      playlistTitle: data.playlist_title,
+      playlistCover: data.playlist_cover,
+      curatorId: data.curator_id,
+      curatorName: data.curator_name,
+      pitchType: data.pitch_type,
+      pitchCost: data.pitch_cost || 0,
+      status: data.status,
+      customMessage: data.custom_message,
+      feedbackTags: data.feedback_tags || [],
+      feedbackNote: data.feedback_note,
+      spotifyPlacementUrl: data.spotify_placement_url,
+      submittedAt: data.submitted_at,
+      reviewedAt: data.reviewed_at
+    };
+  }
+
+  /**
+   * Spends credits and creates submission in one atomic transaction.
+   */
+  public async spendCreditsAndCreateSubmission(params: {
+    artistId: string;
+    playlistId: string;
+    track: any;
+    pitchType: 'free' | 'premium';
+    customMessage?: string;
+  }): Promise<{ submission: SubmissionRecord; newBalance: number }> {
+    const { artistId, playlistId, track, pitchType, customMessage } = params;
+    const supabase = getClient();
+
+    const { data, error } = await supabase.rpc('spend_credits_and_create_submission', {
+      p_artist_id: artistId,
+      p_playlist_id: playlistId,
+      p_track: track,
+      p_pitch_type: pitchType,
+      p_custom_message: customMessage || ''
     });
 
-    if (updated) {
-      this.save();
+    if (error) {
+      throw new Error(`Failed to spend credits and create submission: ${error.message}`);
     }
-  }
 
-  // --- Users ---
-  public getUsers(): UserRecord[] {
-    return this.data.users;
-  }
+    const profile = await this.getUserProfile(artistId);
 
-  public getUserById(id: string): UserRecord | undefined {
-    return this.data.users.find((u) => u.id === id);
-  }
-
-  public getUserByEmail(email: string): UserRecord | undefined {
-    if (!email) return undefined;
-    const target = email.toLowerCase();
-    return this.data.users.find((u) => (u.email || '').toLowerCase() === target);
-  }
-
-  public createUser(user: Omit<UserRecord, 'id' | 'createdAt' | 'freeWeeklyCredits' | 'lastWeeklyReset' | 'totalSubmissions' | 'totalPlacements'>): UserRecord {
-    const newUser: UserRecord = {
-      ...user,
-      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      freeWeeklyCredits: 2,
-      creditBalance: user.creditBalance ?? 0,
-      lastWeeklyReset: new Date().toISOString(),
-      totalSubmissions: 0,
-      totalPlacements: 0,
-      createdAt: new Date().toISOString()
+    return {
+      submission: {
+        id: data.id,
+        trackId: data.track_id,
+        track: data.track,
+        artistId: data.artist_id,
+        artistName: data.artist_name,
+        artistAvatar: data.artist_avatar,
+        playlistId: data.playlist_id,
+        playlistTitle: data.playlist_title,
+        playlistCover: data.playlist_cover,
+        curatorId: data.curator_id,
+        curatorName: data.curator_name,
+        pitchType: data.pitch_type,
+        pitchCost: data.pitch_cost || 0,
+        status: data.status,
+        customMessage: data.custom_message,
+        feedbackTags: data.feedback_tags || [],
+        feedbackNote: data.feedback_note,
+        submittedAt: data.submitted_at
+      },
+      newBalance: profile?.creditBalance || 0
     };
-    this.data.users.push(newUser);
-    this.save();
-    return newUser;
   }
 
-  public updateUser(id: string, updates: Partial<UserRecord>): UserRecord | undefined {
-    const idx = this.data.users.findIndex((u) => u.id === id);
-    if (idx === -1) return undefined;
+  public async reviewSubmission(params: {
+    submissionId: string;
+    decision: 'approve' | 'decline';
+    feedbackTags?: string[];
+    feedbackNote?: string;
+    spotifyPlacementUrl?: string;
+  }): Promise<SubmissionRecord | null> {
+    const supabase = getClient();
+    const status = params.decision === 'approve' ? 'approved' : 'declined';
+    const now = new Date().toISOString();
 
-    this.data.users[idx] = { ...this.data.users[idx], ...updates };
-    this.save();
-    return this.data.users[idx];
-  }
+    const { data, error } = await supabase
+      .from('submissions')
+      .update({
+        status,
+        feedback_tags: params.feedbackTags || [],
+        feedback_note: params.feedbackNote || '',
+        spotify_placement_url: params.spotifyPlacementUrl,
+        reviewed_at: now
+      })
+      .eq('id', params.submissionId)
+      .select()
+      .single();
 
-  // --- Playlists ---
-  public getPlaylists(): PlaylistRecord[] {
-    return this.data.playlists;
-  }
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(`Failed to review submission: ${error.message}`);
+    }
 
-  public getPlaylistById(id: string): PlaylistRecord | undefined {
-    return this.data.playlists.find((p) => p.id === id);
-  }
-
-  public createPlaylist(playlist: Omit<PlaylistRecord, 'id'>): PlaylistRecord {
-    const newPlaylist: PlaylistRecord = {
-      ...playlist,
-      id: `pl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    return {
+      id: data.id,
+      trackId: data.track_id,
+      track: data.track,
+      artistId: data.artist_id,
+      artistName: data.artist_name,
+      artistAvatar: data.artist_avatar,
+      playlistId: data.playlist_id,
+      playlistTitle: data.playlist_title,
+      playlistCover: data.playlist_cover,
+      curatorId: data.curator_id,
+      curatorName: data.curator_name,
+      pitchType: data.pitch_type,
+      pitchCost: data.pitch_cost || 0,
+      status: data.status,
+      customMessage: data.custom_message,
+      feedbackTags: data.feedback_tags || [],
+      feedbackNote: data.feedback_note,
+      spotifyPlacementUrl: data.spotify_placement_url,
+      submittedAt: data.submitted_at,
+      reviewedAt: data.reviewed_at
     };
-    this.data.playlists.unshift(newPlaylist);
-    
-    // Add activity
-    this.addCuratorActivity({
-      curatorId: newPlaylist.curatorId,
-      curatorName: newPlaylist.curatorName,
-      curatorAvatar: newPlaylist.curatorAvatar,
-      action: 'added_playlist',
-      playlistTitle: newPlaylist.title,
-      timestamp: 'Just now'
+  }
+
+  // ==========================================
+  // CREDIT WALLET & LEDGER (IDEMPOTENT & ATOMIC)
+  // ==========================================
+  public async creditWallet(params: {
+    userId: string;
+    amount: number;
+    type: 'purchase' | 'refund' | 'admin_adjustment';
+    description: string;
+    paypalOrderId?: string;
+    paypalAmountUsd?: number;
+    paypalPayerEmail?: string;
+  }): Promise<{ success: boolean; newBalance: number; transactionId: string; idempotent: boolean }> {
+    const { userId, amount, type, description, paypalOrderId, paypalAmountUsd, paypalPayerEmail } = params;
+    const supabase = getClient();
+
+    const { data, error } = await supabase.rpc('credit_wallet', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_type: type,
+      p_description: description,
+      p_paypal_order_id: paypalOrderId || null,
+      p_paypal_amount_usd: paypalAmountUsd || null,
+      p_paypal_payer_email: paypalPayerEmail || null
     });
 
-    this.save();
-    return newPlaylist;
-  }
-
-  public updatePlaylist(id: string, updates: Partial<PlaylistRecord>): PlaylistRecord | undefined {
-    const idx = this.data.playlists.findIndex((p) => p.id === id);
-    if (idx === -1) return undefined;
-
-    this.data.playlists[idx] = { ...this.data.playlists[idx], ...updates };
-    this.save();
-    return this.data.playlists[idx];
-  }
-
-  // --- Submissions ---
-  public getSubmissions(): SubmissionRecord[] {
-    return this.data.submissions;
-  }
-
-  public getSubmissionById(id: string): SubmissionRecord | undefined {
-    return this.data.submissions.find((s) => s.id === id);
-  }
-
-  public createSubmission(submission: Omit<SubmissionRecord, 'id' | 'submittedAt'>): SubmissionRecord {
-    const newSub: SubmissionRecord = {
-      ...submission,
-      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      submittedAt: new Date().toISOString()
-    };
-    this.data.submissions.unshift(newSub);
-
-    // Update user submissions count
-    const user = this.getUserById(newSub.artistId);
-    if (user) {
-      this.updateUser(user.id, { totalSubmissions: user.totalSubmissions + 1 });
+    if (error) {
+      throw new Error(`Failed to credit wallet: ${error.message}`);
     }
 
-    this.save();
-    return newSub;
+    return {
+      success: true,
+      newBalance: data.new_balance,
+      transactionId: data.transaction_id,
+      idempotent: Boolean(data.idempotent)
+    };
   }
 
-  public updateSubmission(id: string, updates: Partial<SubmissionRecord>): SubmissionRecord | undefined {
-    const idx = this.data.submissions.findIndex((s) => s.id === id);
-    if (idx === -1) return undefined;
+  /**
+   * Atomic refund for submissions via PostgreSQL RPC function
+   */
+  public async refundSubmissionCredits(
+    submissionId: string,
+    reason = '48-Hour SLA Guarantee Exceeded'
+  ): Promise<{ success: boolean; submissionId: string; refundedAmount: number; newBalance: number }> {
+    const supabase = getClient();
+    const { data, error } = await supabase.rpc('refund_submission_credits', {
+      p_submission_id: submissionId,
+      p_reason: reason
+    });
 
-    this.data.submissions[idx] = { ...this.data.submissions[idx], ...updates };
-
-    // If approved, increment artist totalPlacements
-    if (updates.status === 'approved' || updates.status === 'added_to_playlist') {
-      const artist = this.getUserById(this.data.submissions[idx].artistId);
-      if (artist) {
-        this.updateUser(artist.id, { totalPlacements: artist.totalPlacements + 1 });
-      }
+    if (error) {
+      throw new Error(`Failed to refund submission credits: ${error.message}`);
     }
 
-    this.save();
-    return this.data.submissions[idx];
+    return {
+      success: true,
+      submissionId: data.submission_id,
+      refundedAmount: data.refunded_amount,
+      newBalance: data.new_balance
+    };
   }
 
-  // --- Transactions ---
-  public getTransactions(userId?: string): TransactionRecord[] {
-    if (userId) {
-      return this.data.transactions.filter((t) => t.userId === userId);
+  public async getTransactionsForUser(userId: string): Promise<LedgerRecord[]> {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('credit_ledger')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch transactions: ${error.message}`);
     }
-    return this.data.transactions;
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      userId: d.user_id,
+      amount: d.amount,
+      type: d.type,
+      description: d.description,
+      status: d.status,
+      paypalOrderId: d.paypal_order_id,
+      paypalAmountUsd: d.paypal_amount_usd,
+      paypalPayerEmail: d.paypal_payer_email,
+      createdAt: d.created_at
+    }));
   }
 
-  public addTransaction(tx: Omit<TransactionRecord, 'id' | 'createdAt'>): TransactionRecord {
-    const newTx: TransactionRecord = {
-      ...tx,
-      id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      createdAt: new Date().toISOString()
+  // ==========================================
+  // ABUSE REPORTS (PHASE 6)
+  // ==========================================
+  public async createReport(data: Omit<ReportRecord, 'id' | 'status' | 'createdAt'>): Promise<ReportRecord> {
+    const supabase = getClient();
+    const id = `rep_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const insertData = {
+      id,
+      reporter_id: data.reporterId,
+      reporter_email: data.reporterEmail,
+      target_type: data.targetType,
+      target_id: data.targetId,
+      target_title: data.targetTitle,
+      reason: data.reason,
+      details: data.details,
+      status: 'open',
+      created_at: now
     };
-    this.data.transactions.unshift(newTx);
-    this.save();
-    return newTx;
-  }
 
-  // --- Email Logs ---
-  public getEmails(): EmailLogRecord[] {
-    return this.data.emails;
-  }
-
-  public logEmail(email: Omit<EmailLogRecord, 'id' | 'sentAt'>): EmailLogRecord {
-    const record: EmailLogRecord = {
-      ...email,
-      id: `eml_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      sentAt: new Date().toISOString()
-    };
-    this.data.emails.unshift(record);
-    if (this.data.emails.length > 200) {
-      this.data.emails = this.data.emails.slice(0, 200);
+    const { data: created, error } = await supabase.from('reports').insert(insertData).select().single();
+    if (error) {
+      throw new Error(`Failed to create report: ${error.message}`);
     }
-    this.save();
-    return record;
-  }
 
-  // --- Curator Activities ---
-  public getCuratorActivities(): CuratorActivityRecord[] {
-    return this.data.curatorActivities;
-  }
-
-  public addCuratorActivity(act: Omit<CuratorActivityRecord, 'id'>): CuratorActivityRecord {
-    const newAct: CuratorActivityRecord = {
-      ...act,
-      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    return {
+      id: created.id,
+      reporterId: created.reporter_id,
+      reporterEmail: created.reporter_email,
+      targetType: created.target_type,
+      targetId: created.target_id,
+      targetTitle: created.target_title,
+      reason: created.reason,
+      details: created.details,
+      status: created.status,
+      createdAt: created.created_at
     };
-    this.data.curatorActivities.unshift(newAct);
-    if (this.data.curatorActivities.length > 50) {
-      this.data.curatorActivities = this.data.curatorActivities.slice(0, 50);
+  }
+
+  public async getReports(): Promise<ReportRecord[]> {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch reports: ${error.message}`);
     }
-    this.save();
-    return newAct;
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      reporterId: d.reporter_id,
+      reporterEmail: d.reporter_email,
+      targetType: d.target_type,
+      targetId: d.target_id,
+      targetTitle: d.target_title,
+      reason: d.reason,
+      details: d.details,
+      status: d.status,
+      adminNotes: d.admin_notes,
+      createdAt: d.created_at,
+      resolvedAt: d.resolved_at
+    }));
   }
 
-  // --- Tracks ---
-  public getTracks(): TrackRecord[] {
-    return this.data.tracks;
+  public async updateReportStatus(id: string, status: 'resolved' | 'dismissed', adminNotes?: string): Promise<boolean> {
+    const supabase = getClient();
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status,
+        admin_notes: adminNotes,
+        resolved_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to update report status: ${error.message}`);
+    }
+
+    return true;
   }
 
-  public addTrack(track: Omit<TrackRecord, 'id'>): TrackRecord {
-    const newTrack: TrackRecord = {
-      ...track,
-      id: `trk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+  // ==========================================
+  // TRANSACTIONAL EMAIL LOGS (PHASE 6)
+  // ==========================================
+  public async logEmail(data: Omit<EmailLogRecord, 'id' | 'sentAt'>): Promise<EmailLogRecord> {
+    const supabase = getClient();
+    const id = `em_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const insertData = {
+      id,
+      recipient: data.recipient,
+      subject: data.subject,
+      template: data.template,
+      track_title: data.trackTitle,
+      playlist_title: data.playlistTitle,
+      status: data.status,
+      error_message: data.errorMessage,
+      sent_at: now
     };
-    this.data.tracks.unshift(newTrack);
-    this.save();
-    return newTrack;
+
+    const { data: created, error } = await supabase.from('email_logs').insert(insertData).select().single();
+    if (error) {
+      throw new Error(`Failed to log email: ${error.message}`);
+    }
+
+    return {
+      id: created.id,
+      recipient: created.recipient,
+      subject: created.subject,
+      template: created.template,
+      trackTitle: created.track_title,
+      playlistTitle: created.playlist_title,
+      status: created.status,
+      errorMessage: created.error_message,
+      sentAt: created.sent_at
+    };
+  }
+
+  public async getEmails(): Promise<EmailLogRecord[]> {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('email_logs')
+      .select('*')
+      .order('sent_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch email logs: ${error.message}`);
+    }
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      recipient: d.recipient,
+      subject: d.subject,
+      template: d.template,
+      trackTitle: d.track_title,
+      playlistTitle: d.playlist_title,
+      status: d.status,
+      errorMessage: d.error_message,
+      sentAt: d.sent_at
+    }));
+  }
+
+  // ==========================================
+  // DATABASE BACKUP (PHASE 6)
+  // ==========================================
+  public async exportDatabaseSnapshot(): Promise<Record<string, any>> {
+    const supabase = getClient();
+    const [profiles, playlists, submissions, ledger, reports, emailLogs] = await Promise.all([
+      supabase.from('profiles').select('*'),
+      supabase.from('playlists').select('*'),
+      supabase.from('submissions').select('*'),
+      supabase.from('credit_ledger').select('*'),
+      supabase.from('reports').select('*'),
+      supabase.from('email_logs').select('*')
+    ]);
+
+    if (profiles.error) throw new Error(`Snapshot error on profiles: ${profiles.error.message}`);
+    if (playlists.error) throw new Error(`Snapshot error on playlists: ${playlists.error.message}`);
+    if (submissions.error) throw new Error(`Snapshot error on submissions: ${submissions.error.message}`);
+    if (ledger.error) throw new Error(`Snapshot error on credit_ledger: ${ledger.error.message}`);
+    if (reports.error) throw new Error(`Snapshot error on reports: ${reports.error.message}`);
+    if (emailLogs.error) throw new Error(`Snapshot error on email_logs: ${emailLogs.error.message}`);
+
+    return {
+      version: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      profiles: profiles.data || [],
+      playlists: playlists.data || [],
+      submissions: submissions.data || [],
+      creditLedger: ledger.data || [],
+      reports: reports.data || [],
+      emailLogs: emailLogs.data || []
+    };
   }
 }
 
-export const db = new DatabaseManager();
+export const db = new SupabasePostgresDatabase();

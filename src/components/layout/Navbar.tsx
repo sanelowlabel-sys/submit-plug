@@ -16,7 +16,8 @@ import {
   LogIn,
   LogOut,
   LayoutDashboard,
-  Link2
+  Link2,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -148,6 +149,21 @@ export const Navbar: React.FC = () => {
                   <span>Dashboard</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 </button>
+
+                {currentUser.role === 'admin' && (
+                  <button
+                    id="nav-link-admin"
+                    onClick={() => setActiveTab('admin')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeTab === 'admin'
+                        ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
+                        : 'text-amber-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Admin</span>
+                  </button>
+                )}
               </>
             )}
           </nav>
@@ -452,6 +468,17 @@ export const Navbar: React.FC = () => {
               <User className="w-3.5 h-3.5" />
               <span>Profile</span>
             </button>
+            {currentUser.role === 'admin' && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`flex items-center gap-1 py-1 px-2.5 rounded-lg whitespace-nowrap cursor-pointer ${
+                  activeTab === 'admin' ? 'bg-amber-400 text-black font-bold' : 'text-amber-300 hover:text-white'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </button>
+            )}
           </>
         )}
       </div>

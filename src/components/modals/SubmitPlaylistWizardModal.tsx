@@ -161,28 +161,17 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
     try {
       await addPlaylist({
         title,
-        description:
-          description ||
-          'High quality independent playlist curated for discerning Spotify listeners.',
+        description: description || '',
         coverArt,
-        spotifyUrl: spotifyUrl || 'https://open.spotify.com/playlist/37i9dQZF1DXdLEN7aqioXM',
+        spotifyUrl,
         spotifyUri: `spotify:playlist:${Date.now()}`,
-        followerCount: Number(followerCount) || 12500,
-        trackCount: Number(trackCount) || 50,
-        genres: selectedGenres.length > 0 ? selectedGenres : ['Electronic', 'Indie'],
-        pitchCostCredits: acceptPremiumSubmissions ? creditAmount : 0,
+        followerCount: Number(followerCount) || 0,
+        trackCount: Number(trackCount) || 0,
+        genres: selectedGenres.length > 0 ? selectedGenres : ['Indie', 'Alternative'],
+        pitchCostCredits: acceptPremiumSubmissions ? creditAmount : 1,
         freePitchEnabled: acceptFreeSubmissions,
-        isFeatured: true,
-        acceptingSubmissions: true,
-        gates: {
-          requireCuratorFollow,
-          requirePlaylistFollow,
-          requireSongSave,
-          curatorSpotifyProfileUrl:
-            currentUser?.spotifyUri ||
-            `https://open.spotify.com/user/${currentUser?.spotifyId || 'curator'}`,
-          targetSongSpotifyUrl: targetSongUrl
-        }
+        isFeatured: false,
+        acceptingSubmissions: true
       });
 
       // Confetti celebration
@@ -280,7 +269,7 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
           {[
             { step: 1, label: '1. Playlist Info' },
             { step: 2, label: '2. Pricing & Credits' },
-            { step: 3, label: '3. Follower Gates' },
+            { step: 3, label: '3. Verification & SLA' },
             { step: 4, label: '4. Preview & Launch' }
           ].map((item) => (
             <div
@@ -612,93 +601,56 @@ export const SubmitPlaylistWizardModal: React.FC<SubmitPlaylistWizardModalProps>
             </div>
           )}
 
-          {/* STEP 3: CURATOR GATES */}
+          {/* STEP 3: CURATOR VERIFICATION & COMPLIANCE */}
           {currentStep === 3 && (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl glass-panel border border-white/10 flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <ShieldCheck className="w-5 h-5 text-spotify-green flex-shrink-0 mt-0.5" />
                 <div className="text-xs font-sans text-white/70 leading-relaxed">
-                  <strong className="text-white">Spotify Follower & Growth Gates:</strong> Mandatory organic actions
-                  artists must execute before their submission is placed into your inbox.
+                  <strong className="text-white">Spotify Description Ownership Verification:</strong> To protect artists and maintain trust, our platform uses one-time description codes to verify curator ownership without requiring Spotify OAuth login.
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="flex items-center justify-between p-4 rounded-2xl glass-panel border border-white/10 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <UserPlus className="w-4 h-4 text-spotify-green" />
-                    <div>
-                      <div className="text-xs font-sans font-bold text-white">
-                        Require Artist to Follow Curator Spotify Profile
-                      </div>
-                      <div className="text-[11px] font-sans text-white/50">
-                        Grows your personal artist / curator follower count on Spotify
-                      </div>
-                    </div>
+                <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white font-display">
+                    <span className="w-5 h-5 rounded-full bg-spotify-green/20 text-spotify-green flex items-center justify-center text-[10px]">
+                      1
+                    </span>
+                    AUTOMATIC VERIFICATION CODE GENERATION
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={requireCuratorFollow}
-                    onChange={(e) => setRequireCuratorFollow(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-500"
-                  />
-                </label>
+                  <p className="text-xs text-white/60 font-sans leading-relaxed">
+                    Upon launching this playlist, you will receive a unique one-time verification token (e.g. <span className="font-mono text-spotify-green font-bold">PLUG-VERIFY-XXXXXX</span>).
+                  </p>
+                </div>
 
-                <label className="flex items-center justify-between p-4 rounded-2xl glass-panel border border-white/10 cursor-pointer hover:border-emerald-500/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Radio className="w-4 h-4 text-spotify-green" />
-                    <div>
-                      <div className="text-xs font-sans font-bold text-white">
-                        Require Artist to Save & Follow this Playlist
-                      </div>
-                      <div className="text-[11px] font-sans text-white/50">
-                        Expands your playlist’s Spotify organic algorithm reach
-                      </div>
-                    </div>
+                <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white font-display">
+                    <span className="w-5 h-5 rounded-full bg-spotify-green/20 text-spotify-green flex items-center justify-center text-[10px]">
+                      2
+                    </span>
+                    PASTE INTO SPOTIFY PLAYLIST DESCRIPTION
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={requirePlaylistFollow}
-                    onChange={(e) => setRequirePlaylistFollow(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-500"
-                  />
-                </label>
+                  <p className="text-xs text-white/60 font-sans leading-relaxed">
+                    Simply paste the code into your playlist’s description on Spotify. Click "Check Spotify Description" in your Curator Hub to verify immediately.
+                  </p>
+                </div>
 
-                <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2.5">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <Heart className="w-4 h-4 text-spotify-green" />
-                      <div>
-                        <div className="text-xs font-sans font-bold text-white">
-                          Require Artist to Like / Save a Specific Track
-                        </div>
-                        <div className="text-[11px] font-sans text-white/50">
-                          Great for promoting your label’s flagship release or latest single
-                        </div>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={requireSongSave}
-                      onChange={(e) => setRequireSongSave(e.target.checked)}
-                      className="w-4 h-4 accent-spotify-green"
-                    />
-                  </label>
+                <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white font-display">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">
+                      3
+                    </span>
+                    MANUAL ADMIN REVIEW FALLBACK
+                  </div>
+                  <p className="text-xs text-white/60 font-sans leading-relaxed">
+                    If your playlist is managed through third-party distributors or API restrictions prevent live description parsing, you can request an instant manual review from our admin moderation team.
+                  </p>
+                </div>
 
-                  {requireSongSave && (
-                    <div className="pt-2 border-t border-white/10">
-                      <label className="text-[11px] font-sans text-white/70 block mb-1">
-                        Spotify Track Link to Like / Save:
-                      </label>
-                      <input
-                        type="text"
-                        value={targetSongUrl}
-                        onChange={(e) => setTargetSongUrl(e.target.value)}
-                        placeholder="https://open.spotify.com/track/..."
-                        className="w-full bg-surface-hover/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-sans text-white focus:border-spotify-green focus:outline-none"
-                      />
-                    </div>
-                  )}
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 text-xs font-sans text-white/60 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-spotify-green flex-shrink-0" />
+                  <span>100% Anti-Payola Compliant • No Spotify account login or follower gating required.</span>
                 </div>
               </div>
             </div>

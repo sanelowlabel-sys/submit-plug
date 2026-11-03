@@ -23,7 +23,9 @@ import {
   AlertCircle,
   UserPlus,
   Heart,
-  BarChart3
+  BarChart3,
+  Copy,
+  Check
 } from 'lucide-react';
 import { DashboardAnalyticsCharts } from '../common/DashboardAnalyticsCharts';
 
@@ -34,13 +36,16 @@ export const CuratorDashboard: React.FC = () => {
     reviewSubmission,
     userPlaylists,
     togglePlaylistStatus,
+    verifyPlaylistCode,
+    requestPlaylistAdminReview,
     setOnboardPlaylistModalOpen,
     openLoginModal,
     openRegisterModal,
     audioState,
     playTrack,
     pauseTrack,
-    curatorActivities
+    curatorActivities,
+    showToast
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'inbox' | 'playlists' | 'growth' | 'analytics' | 'verification'>('inbox');
@@ -49,6 +54,8 @@ export const CuratorDashboard: React.FC = () => {
   const [feedbackTags, setFeedbackTags] = useState<string[]>([]);
   const [customNote, setCustomNote] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const pendingSubmissions = curatorInboxSubmissions.filter(s => s.status === 'pending');
   const completedSubmissions = curatorInboxSubmissions.filter(s => s.status !== 'pending');
@@ -91,6 +98,23 @@ export const CuratorDashboard: React.FC = () => {
     setFeedbackTags(prev =>
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
+  };
+
+  const handleCopyCode = (playlistId: string, code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCodeId(playlistId);
+    showToast('Code Copied', 'Paste this code into your Spotify playlist description.', 'info');
+    setTimeout(() => setCopiedCodeId(null), 3000);
+  };
+
+  const handleVerifyCode = async (playlistId: string) => {
+    setVerifyingId(playlistId);
+    await verifyPlaylistCode(playlistId);
+    setVerifyingId(null);
+  };
+
+  const handleRequestReview = async (playlistId: string) => {
+    await requestPlaylistAdminReview(playlistId);
   };
 
   if (!currentUser) {
@@ -496,9 +520,24 @@ export const CuratorDashboard: React.FC = () => {
                       referrerPolicy="no-referrer"
                     />
                     <div>
-                      <h4 className="text-sm font-bold font-display text-white truncate max-w-[200px]">
-                        {pl.title}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold font-display text-white truncate max-w-[180px]">
+                          {pl.title}
+                        </h4>
+                        {pl.verificationStatus === 'verified' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-sans font-bold border border-emerald-500/30 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" /> Verified
+                          </span>
+                        ) : pl.verificationStatus === 'pending_admin_review' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-sans font-bold border border-amber-500/30">
+                            Admin Review Pending
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-sans font-bold border border-blue-500/30">
+                            Code Required
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-white/60 font-sans">
                         {pl.followerCount.toLocaleString()} Followers • {pl.trackCount} Tracks
                       </div>
@@ -520,6 +559,62 @@ export const CuratorDashboard: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Spotify Description Ownership Verification Flow */}
+                {pl.verificationStatus !== 'verified' && (
+                  <div className="p-3.5 rounded-xl bg-surface-hover/80 border border-white/10 space-y-2 text-xs font-sans">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-spotify-green" />
+                        SPOTIFY DESCRIPTION VERIFICATION CODE
+                      </span>
+                      {pl.verificationCode && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCode(pl.id, pl.verificationCode!)}
+                          className="text-[10px] font-bold text-spotify-green hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedCodeId === pl.id ? (
+                            <>
+                              <Check className="w-3 h-3" /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" /> Copy Code
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {pl.verificationCode ? (
+                      <div className="font-mono text-xs text-white bg-black/50 p-2 rounded-lg border border-white/10 select-all tracking-wider text-center font-bold">
+                        {pl.verificationCode}
+                      </div>
+                    ) : null}
+                    <p className="text-[11px] text-white/60 leading-relaxed">
+                      Paste this code into your Spotify playlist description so our automated parser or admin can verify your ownership without requiring Spotify OAuth login.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={verifyingId === pl.id}
+                        onClick={() => handleVerifyCode(pl.id)}
+                        className="px-3 py-1.5 bg-spotify-green hover:bg-spotify-green-hover text-black font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50 transition-colors"
+                      >
+                        {verifyingId === pl.id ? 'Checking...' : 'Check Spotify Description'}
+                      </button>
+                      {pl.verificationStatus !== 'pending_admin_review' && (
+                        <button
+                          type="button"
+                          onClick={() => handleRequestReview(pl.id)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg text-xs border border-white/10 cursor-pointer transition-colors"
+                        >
+                          Request Admin Review
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 gap-2 bg-surface-hover p-3 rounded-xl border border-white/10 text-center text-xs font-sans">
                   <div>
                     <div className="text-white/40 text-[10px]">PITCH FEE</div>
@@ -533,7 +628,9 @@ export const CuratorDashboard: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-white/40 text-[10px]">ACCEPTANCE</div>
-                    <div className="font-bold text-amber-300 mt-0.5">{pl.approvalRate}%</div>
+                    <div className="font-bold text-amber-300 mt-0.5">
+                      {pl.approvalRate !== null && pl.approvalRate !== undefined ? `${pl.approvalRate}%` : 'New'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -549,47 +646,51 @@ export const CuratorDashboard: React.FC = () => {
           <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-white/10 space-y-4 bg-surface">
             <div>
               <span className="text-xs font-sans text-spotify-green font-bold">
-                ORGANIC PLAYLIST GROWTH ENGINE
+                CURATOR PERFORMANCE & TRUST METRICS
               </span>
               <h3 className="text-2xl font-display font-bold text-white mt-1">
-                FOLLOWER GATES CONVERSION ANALYTICS
+                EDITORIAL CURATION OVERVIEW
               </h3>
               <p className="text-xs text-white/60 font-sans mt-1 max-w-2xl">
-                Curators grow their Spotify ecosystem on Playlist Plug through verified artist actions: Every free pitch requires artists to follow your Spotify profile, follow your playlist, and save your featured spotlight tracks.
+                Track your active submissions, track placements, and editorial listening performance. All pitches are processed directly under our strict 48-Hour Review SLA.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
               <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface-hover">
                 <div className="text-white/50 text-xs font-sans flex items-center justify-between">
-                  <span>CURATOR SPOTIFY FOLLOWS</span>
-                  <UserPlus className="w-4 h-4 text-spotify-green" />
+                  <span>TOTAL SUBMISSIONS</span>
+                  <ListMusic className="w-4 h-4 text-spotify-green" />
                 </div>
-                <div className="text-3xl font-bold font-display text-white mt-2">+432</div>
+                <div className="text-3xl font-bold font-display text-white mt-2">
+                  {curatorInboxSubmissions.length}
+                </div>
                 <div className="text-[10px] text-spotify-green font-sans mt-1">
-                  100% Real Spotify Users
+                  Ingested In Real-Time
                 </div>
               </div>
 
               <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface-hover">
                 <div className="text-white/50 text-xs font-sans flex items-center justify-between">
-                  <span>PLAYLIST FOLLOWERS GAINED</span>
-                  <Radio className="w-4 h-4 text-spotify-green" />
+                  <span>TRACKS PLACED</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="text-3xl font-bold font-display text-white mt-2">+1,890</div>
+                <div className="text-3xl font-bold font-display text-white mt-2">
+                  {curatorInboxSubmissions.filter(s => s.status === 'approved').length}
+                </div>
                 <div className="text-[10px] text-spotify-green font-sans mt-1">
-                  Direct Library Additions
+                  Added to Rotation
                 </div>
               </div>
 
               <div className="glass-panel p-5 rounded-2xl border border-white/10 bg-surface-hover">
                 <div className="text-white/50 text-xs font-sans flex items-center justify-between">
-                  <span>FEATURED SONGS SAVED</span>
-                  <Heart className="w-4 h-4 text-spotify-green" />
+                  <span>REVIEW SLA</span>
+                  <Clock className="w-4 h-4 text-amber-400" />
                 </div>
-                <div className="text-3xl font-bold font-display text-white mt-2">+645</div>
-                <div className="text-[10px] text-spotify-green font-sans mt-1">
-                  Boosts Algorithmic Reach
+                <div className="text-3xl font-bold font-display text-white mt-2">48h</div>
+                <div className="text-[10px] text-amber-300 font-sans mt-1">
+                  Guaranteed Feedback SLA
                 </div>
               </div>
             </div>

@@ -15,7 +15,8 @@ import {
   Users,
   CheckCircle2,
   Filter,
-  Radio
+  Radio,
+  Flag
 } from 'lucide-react';
 
 export const MarketplaceView: React.FC = () => {
@@ -27,7 +28,8 @@ export const MarketplaceView: React.FC = () => {
     pauseTrack,
     playSpotifyUrl,
     switchUserRole,
-    setOnboardPlaylistModalOpen
+    setOnboardPlaylistModalOpen,
+    openReportModal
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -399,7 +401,9 @@ export const MarketplaceView: React.FC = () => {
                             <div>
                               <div className="text-white/40 font-medium">APPROVAL</div>
                               <div className="font-bold text-emerald-400 text-xs">
-                                {playlist.approvalRate}%
+                                {playlist.approvalRate !== null && playlist.approvalRate !== undefined
+                                  ? `${playlist.approvalRate}%`
+                                  : 'New'}
                               </div>
                             </div>
                             <div>
@@ -448,6 +452,13 @@ export const MarketplaceView: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openReportModal('playlist', playlist.id, playlist.title)}
+                          className="p-2 rounded-xl bg-surface border border-white/10 text-white/40 hover:text-rose-400 hover:border-rose-500/40 transition-colors cursor-pointer"
+                          title="Report Playlist / Curator"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                        </button>
                         <a
                           href={playlist.spotifyUrl}
                           target="_blank"

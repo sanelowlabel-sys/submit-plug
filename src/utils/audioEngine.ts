@@ -165,6 +165,45 @@ class AudioEngine {
     }, beatInterval / 2);
   }
 
+  public load(url: string) {
+    this.stop();
+    if (url && url.startsWith('http') && !url.includes('placeholder')) {
+      try {
+        const audio = new Audio(url);
+        audio.crossOrigin = 'anonymous';
+        audio.volume = 0.8;
+        this.currentAudio = audio;
+      } catch {}
+    }
+  }
+
+  public play() {
+    this.initContext();
+    if (this.currentAudio) {
+      this.currentAudio.play().catch(() => {});
+    }
+  }
+
+  public pause() {
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.pause();
+      } catch {}
+    }
+    if (this.synthInterval) {
+      clearInterval(this.synthInterval);
+      this.synthInterval = null;
+    }
+    this.isPlayingSynth = false;
+  }
+
+  public resume() {
+    this.initContext();
+    if (this.currentAudio) {
+      this.currentAudio.play().catch(() => {});
+    }
+  }
+
   public stop() {
     this.isPlayingSynth = false;
     if (this.synthInterval) {

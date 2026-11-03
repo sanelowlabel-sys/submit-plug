@@ -87,7 +87,7 @@ export const ArtistDashboard: React.FC = () => {
       const gLower = (g || '').toLowerCase();
       return gLower.includes(artistGenre) || artistGenre.includes(gLower);
     });
-    const matchScore = genreMatch ? (pl.approvalRate > 15 ? 96 : 89) : 74;
+    const matchScore = genreMatch ? (pl.approvalRate && pl.approvalRate > 15 ? 96 : 89) : 74;
     return { playlist: pl, matchScore };
   }).sort((a, b) => b.matchScore - a.matchScore).slice(0, 4);
 
@@ -648,7 +648,9 @@ export const ArtistDashboard: React.FC = () => {
                 <div className="bg-surface-hover/70 p-3 rounded-2xl border border-white/10 flex items-center justify-between text-xs font-sans">
                   <div>
                     <span className="text-white/40">Approval: </span>
-                    <strong className="text-emerald-400">{playlist.approvalRate}%</strong>
+                    <strong className="text-emerald-400">
+                      {playlist.approvalRate !== null && playlist.approvalRate !== undefined ? `${playlist.approvalRate}%` : 'New'}
+                    </strong>
                   </div>
                   <div>
                     <span className="text-white/40">Turnaround: </span>
